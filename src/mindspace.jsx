@@ -241,20 +241,8 @@ export default function MindSpace() {
     const newMessages = [...chatMessages, { role: "user", content: userMsg }];
     setChatMessages(newMessages);
     setIsLoading(true);
-    const history = newMessages.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": "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",
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true"
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system: `You are Milo, an empathetic wellness assistant for young people (11-18 years old). Your role is emotional support, NOT medical diagnosis.
+    const messages = [
+      { role: "system", content: `You are Milo, an empathetic wellness assistant for young people (11-18 years old). Your role is emotional support, NOT medical diagnosis.
 
 RULES:
 - Always respond in English
@@ -266,12 +254,24 @@ RULES:
 - Keep responses short (3-6 sentences) unless the situation requires more
 - Occasionally ask one open question to continue the conversation
 - Don't be robotic — be natural, warm
-- You can use emoji sparingly (1-2 per message)`,
-          messages: history
+- You can use emoji sparingly (1-2 per message)` },
+      ...newMessages.map(m => ({ role: m.role, content: m.content }))
+    ];
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          max_tokens: 1000,
+          messages
         })
       });
       const data = await res.json();
-      const reply = data.content?.[0]?.text || "Sorry, something went wrong. Please try again.";
+      const reply = data.choices?.[0]?.message?.content || "Sorry, something went wrong. Please try again.";
       setChatMessages(prev => [...prev, { role: "assistant", content: reply }]);
     } catch {
       setChatMessages(prev => [...prev, { role: "assistant", content: "Oops, connection issue. Try again in a moment! 🔄" }]);
