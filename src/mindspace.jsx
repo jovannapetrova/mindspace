@@ -47,6 +47,25 @@ const ALL_QUESTS = [
   { id: "q12", icon: "🤝", title: "Help someone today", desc: "HBSC: Acts of kindness improve the giver's mood for up to 24 hours.", xp: 25, category: "social" },
 ];
 
+const GAD7_QUESTIONS = [
+  "Feeling nervous, anxious, or on edge",
+  "Not being able to stop or control worrying",
+  "Worrying too much about different things",
+  "Trouble relaxing",
+  "Being so restless that it is hard to sit still",
+  "Becoming easily annoyed or irritable",
+  "Feeling afraid, as if something awful might happen",
+];
+
+const GAD7_OPTIONS = ["Not at all", "Several days", "More than half the days", "Nearly every day"];
+
+function getGad7Severity(score) {
+  if (score <= 4) return { label: "Minimal", color: "#22c55e" };
+  if (score <= 9) return { label: "Mild", color: "#eab308" };
+  if (score <= 14) return { label: "Moderate", color: "#f97316" };
+  return { label: "Severe", color: "#ef4444" };
+}
+
 const CATEGORY_COLORS = {
   physical: "#22c55e",
   sleep: "#8b5cf6",
@@ -90,6 +109,22 @@ export default function MindSpace() {
   const [isLoading, setIsLoading] = useState(false);
   const [showCrisis, setShowCrisis] = useState(false);
 
+  // GAD-7 state
+  const [gad7History, setGad7History] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("ms_gad7") || "[]"); } catch { return []; }
+  });
+  const [showGad7Quiz, setShowGad7Quiz] = useState(false);
+  const [gad7Step, setGad7Step] = useState(0);
+  const [gad7Answers, setGad7Answers] = useState(Array(7).fill(null));
+
+  // Worry Journal state
+  const [worryEntries, setWorryEntries] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("ms_worries") || "[]"); } catch { return []; }
+  });
+  const [worryForm, setWorryForm] = useState({ worry: "", likelihood: 5, worst: "", best: "", realistic: "" });
+  const [worryFormOpen, setWorryFormOpen] = useState(false);
+  const [worrySaved, setWorrySaved] = useState(false);
+
   // Quest / game state
   const [xp, setXp] = useState(() => {
     try { return parseInt(localStorage.getItem("ms_xp") || "0"); } catch { return 0; }
@@ -129,6 +164,14 @@ export default function MindSpace() {
   }, [dailyQuests]);
 
   useEffect(() => {
+    try { localStorage.setItem("ms_gad7", JSON.stringify(gad7History)); } catch {}
+  }, [gad7History]);
+
+  useEffect(() => {
+    try { localStorage.setItem("ms_worries", JSON.stringify(worryEntries)); } catch {}
+  }, [worryEntries]);
+
+  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
@@ -163,6 +206,32 @@ export default function MindSpace() {
   function isQuestDoneToday(questId) {
     const today = new Date().toDateString();
     return !!completedQuests[`${questId}_${today}`];
+  }
+
+  function submitGad7() {
+    const score = gad7Answers.reduce((s, a) => s + (a ?? 0), 0);
+    const severity = getGad7Severity(score);
+    const entry = { id: Date.now(), date: new Date().toISOString(), score, severity: severity.label, answers: [...gad7Answers] };
+    setGad7History(prev => [entry, ...prev].slice(0, 20));
+    awardXP(20, "GAD-7 completed +20 XP");
+    setGad7Step(7);
+  }
+
+  function resetGad7Quiz() {
+    setGad7Answers(Array(7).fill(null));
+    setGad7Step(0);
+    setShowGad7Quiz(false);
+  }
+
+  function saveWorry() {
+    if (!worryForm.worry.trim()) return;
+    const entry = { id: Date.now(), date: new Date().toISOString(), ...worryForm };
+    setWorryEntries(prev => [entry, ...prev].slice(0, 50));
+    awardXP(10, "Worry logged +10 XP");
+    setWorryForm({ worry: "", likelihood: 5, worst: "", best: "", realistic: "" });
+    setWorryFormOpen(false);
+    setWorrySaved(true);
+    setTimeout(() => setWorrySaved(false), 1500);
   }
 
   async function sendChat() {
@@ -299,6 +368,8 @@ RULES:
             { id: "history", label: "History", icon: "📔" },
             { id: "chat", label: "Chat", icon: "💬" },
             { id: "tips", label: "Tips", icon: "💡" },
+            { id: "gad7", label: "Check-in", icon: "📋" },
+            { id: "worry", label: "Worries", icon: "🧩" },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -586,7 +657,251 @@ RULES:
             ))}
           </div>
         )}
+
+        {/* GAD-7 TAB */}
+        {tab === "gad7" && (
+          <div>
+            <div style={{ background: "#1a1a2e", border: "1px solid #4f46e5", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+              <div style={{ fontWeight: 600, fontSize: 12, color: "#818cf8", marginBottom: 5 }}>📋 GAD-7 Anxiety Scale</div>
+              <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.7 }}>
+                The GAD-7 is a validated clinical tool used by psychologists worldwide to measure generalised anxiety. Answer 7 questions weekly to track your anxiety levels over time.
+              </div>
+            </div>
+
+            {gad7History.length > 0 && (() => {
+              const latest = gad7History[0];
+              const sev = getGad7Severity(latest.score);
+              return (
+                <div style={{ background: "#1e293b", borderRadius: 14, padding: "14px 16px", marginBottom: 14, borderLeft: `4px solid ${sev.color}` }}>
+                  <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Latest assessment — {formatDate(latest.date)}</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div>
+                      <span style={{ fontSize: 28, fontWeight: 700, color: sev.color }}>{latest.score}</span>
+                      <span style={{ fontSize: 13, color: "#64748b" }}>/21</span>
+                    </div>
+                    <span style={{ background: `${sev.color}20`, border: `1px solid ${sev.color}40`, borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 600, color: sev.color }}>{sev.label} anxiety</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {gad7History.length === 0 && (
+              <div style={{ textAlign: "center", padding: "24px 0 16px", color: "#475569" }}>
+                <div style={{ fontSize: 34, marginBottom: 8 }}>📋</div>
+                <p style={{ fontSize: 13, lineHeight: 1.6 }}>No assessments yet.<br />Take your first GAD-7 check-in below.</p>
+              </div>
+            )}
+
+            <button onClick={() => { setGad7Step(0); setGad7Answers(Array(7).fill(null)); setShowGad7Quiz(true); }} style={{ width: "100%", padding: 13, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", border: "none", borderRadius: 12, cursor: "pointer", color: "white", fontWeight: 600, fontSize: 14, marginBottom: 20 }}>
+              Start This Week's Check-in
+            </button>
+
+            {gad7History.length > 0 && (
+              <>
+                <div style={{ fontSize: 11, color: "#64748b", fontWeight: 500, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>History ({gad7History.length})</div>
+                {gad7History.map(entry => {
+                  const sev = getGad7Severity(entry.score);
+                  return (
+                    <div key={entry.id} style={{ background: "#1e293b", borderRadius: 10, padding: "10px 13px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", marginBottom: 2 }}>{formatDate(entry.date)}</div>
+                        <div style={{ fontSize: 11, color: "#64748b" }}>Score: {entry.score}/21</div>
+                      </div>
+                      <span style={{ background: `${sev.color}20`, border: `1px solid ${sev.color}40`, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600, color: sev.color }}>{sev.label}</span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* WORRY JOURNAL TAB */}
+        {tab === "worry" && (
+          <div>
+            <div style={{ background: "#1a1a2e", border: "1px solid #4f46e5", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+              <div style={{ fontWeight: 600, fontSize: 12, color: "#818cf8", marginBottom: 5 }}>🧩 CBT Worry Journal</div>
+              <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.7 }}>
+                Cognitive Behavioural Therapy (CBT) shows that writing out worries and challenging them reduces anxiety. Log a worry and walk through it step by step.
+              </div>
+            </div>
+
+            <button onClick={() => setWorryFormOpen(o => !o)} style={{ width: "100%", padding: 12, background: worryFormOpen ? "#1e293b" : "linear-gradient(135deg, #6366f1, #8b5cf6)", border: worryFormOpen ? "1px solid #334155" : "none", borderRadius: 12, cursor: "pointer", color: worryFormOpen ? "#64748b" : "white", fontWeight: 600, fontSize: 13, marginBottom: 12, transition: "all 0.2s" }}>
+              {worryFormOpen ? "✕ Cancel" : worrySaved ? "✓ Saved!" : "+ Log a Worry"}
+            </button>
+
+            {worryFormOpen && (
+              <div style={{ background: "#1e293b", borderRadius: 14, padding: 14, marginBottom: 14 }}>
+                <div style={{ marginBottom: 12 }}>
+                  <p style={{ fontSize: 12, color: "#94a3b8", marginBottom: 6, fontWeight: 600 }}>What's the worry?</p>
+                  <textarea value={worryForm.worry} onChange={e => setWorryForm(f => ({ ...f, worry: e.target.value }))} placeholder="Describe what's worrying you..." style={{ width: "100%", minHeight: 70, background: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: 9, color: "#e2e8f0", fontSize: 12, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5, fontFamily: "inherit" }} />
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <p style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>How likely is it to happen?</p>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: worryForm.likelihood <= 3 ? "#22c55e" : worryForm.likelihood <= 6 ? "#eab308" : "#ef4444" }}>{worryForm.likelihood}/10</span>
+                  </div>
+                  <input type="range" min="1" max="10" value={worryForm.likelihood} onChange={e => setWorryForm(f => ({ ...f, likelihood: parseInt(e.target.value) }))} style={{ width: "100%", accentColor: "#6366f1" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#475569", marginTop: 2 }}>
+                    <span>Very unlikely</span><span>Very likely</span>
+                  </div>
+                </div>
+
+                {[
+                  { key: "worst", label: "Worst case outcome", color: "#ef4444", placeholder: "What's the absolute worst that could happen?" },
+                  { key: "best", label: "Best case outcome", color: "#22c55e", placeholder: "What's the best that could happen?" },
+                  { key: "realistic", label: "Most realistic outcome", color: "#6366f1", placeholder: "What will most likely actually happen?" },
+                ].map(({ key, label, color, placeholder }) => (
+                  <div key={key} style={{ marginBottom: 10 }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 5 }}><span style={{ color }}>●</span> <span style={{ color: "#94a3b8" }}>{label}</span></p>
+                    <textarea value={worryForm[key]} onChange={e => setWorryForm(f => ({ ...f, [key]: e.target.value }))} placeholder={placeholder} style={{ width: "100%", minHeight: 55, background: "#0f172a", border: `1px solid ${color}30`, borderRadius: 8, padding: 9, color: "#e2e8f0", fontSize: 12, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5, fontFamily: "inherit" }} />
+                  </div>
+                ))}
+
+                <button onClick={saveWorry} style={{ width: "100%", padding: 12, background: worryForm.worry.trim() ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "#0f172a", border: "none", borderRadius: 11, cursor: worryForm.worry.trim() ? "pointer" : "default", color: worryForm.worry.trim() ? "white" : "#334155", fontWeight: 600, fontSize: 13, transition: "all 0.2s" }}>
+                  Save Entry
+                </button>
+              </div>
+            )}
+
+            {worryEntries.length === 0 && !worryFormOpen && (
+              <div style={{ textAlign: "center", padding: "28px 0", color: "#475569" }}>
+                <div style={{ fontSize: 34, marginBottom: 8 }}>🧩</div>
+                <p style={{ fontSize: 13, lineHeight: 1.6 }}>No worry entries yet.<br />Log your first one above.</p>
+              </div>
+            )}
+
+            {worryEntries.length > 0 && (
+              <>
+                <div style={{ fontSize: 11, color: "#64748b", fontWeight: 500, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>Past Entries ({worryEntries.length})</div>
+                {worryEntries.map(entry => {
+                  const likColor = entry.likelihood <= 3 ? "#22c55e" : entry.likelihood <= 6 ? "#eab308" : "#ef4444";
+                  return (
+                    <div key={entry.id} style={{ background: "#1e293b", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <span style={{ fontSize: 10, color: "#475569" }}>{formatDate(entry.date)}</span>
+                        <span style={{ background: `${likColor}20`, border: `1px solid ${likColor}40`, borderRadius: 20, padding: "2px 9px", fontSize: 11, fontWeight: 600, color: likColor }}>Likelihood: {entry.likelihood}/10</span>
+                      </div>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", marginBottom: 8, lineHeight: 1.5 }}>{entry.worry}</p>
+                      {[
+                        { key: "worst", label: "Worst case", color: "#ef4444" },
+                        { key: "best", label: "Best case", color: "#22c55e" },
+                        { key: "realistic", label: "Most realistic", color: "#6366f1" },
+                      ].filter(({ key }) => entry[key]).map(({ key, label, color }) => (
+                        <div key={key} style={{ marginBottom: 5 }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, color, marginRight: 5 }}>{label}:</span>
+                          <span style={{ fontSize: 11, color: "#64748b" }}>{entry[key]}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        )}
+
       </div>
+
+      {/* GAD-7 Quiz Modal */}
+      {showGad7Quiz && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", zIndex: 100 }}>
+          <div style={{ background: "#1e293b", borderRadius: "18px 18px 0 0", padding: "20px 16px", paddingBottom: "max(env(safe-area-inset-bottom), 20px)", width: "100%", maxWidth: "100%" }}>
+            <div style={{ width: 32, height: 4, background: "#334155", borderRadius: 2, margin: "0 auto 16px" }} />
+
+            {gad7Step < 7 ? (
+              <>
+                {/* Progress bar */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                    <span style={{ fontSize: 11, color: "#64748b" }}>Question {gad7Step + 1} of 7</span>
+                    <span style={{ fontSize: 11, color: "#818cf8" }}>GAD-7</span>
+                  </div>
+                  <div style={{ height: 4, background: "#0f172a", borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${((gad7Step + 1) / 7) * 100}%`, background: "linear-gradient(90deg, #6366f1, #8b5cf6)", borderRadius: 2, transition: "width 0.3s" }} />
+                  </div>
+                </div>
+
+                <p style={{ fontSize: 13, color: "#94a3b8", marginBottom: 4, lineHeight: 1.5 }}>Over the <strong style={{ color: "#e2e8f0" }}>last 2 weeks</strong>, how often have you been bothered by:</p>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "#e2e8f0", marginBottom: 16, lineHeight: 1.5 }}>{GAD7_QUESTIONS[gad7Step]}</p>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+                  {GAD7_OPTIONS.map((opt, i) => (
+                    <button key={i} onClick={() => setGad7Answers(prev => { const a = [...prev]; a[gad7Step] = i; return a; })} style={{
+                      background: gad7Answers[gad7Step] === i ? "#4f46e520" : "#0f172a",
+                      border: `2px solid ${gad7Answers[gad7Step] === i ? "#6366f1" : "#334155"}`,
+                      borderRadius: 10, padding: "10px 14px", cursor: "pointer", textAlign: "left",
+                      color: gad7Answers[gad7Step] === i ? "#818cf8" : "#64748b",
+                      fontSize: 13, fontWeight: gad7Answers[gad7Step] === i ? 600 : 400,
+                      transition: "all 0.15s", display: "flex", alignItems: "center", gap: 10
+                    }}>
+                      <span style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${gad7Answers[gad7Step] === i ? "#6366f1" : "#334155"}`, background: gad7Answers[gad7Step] === i ? "#6366f1" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {gad7Answers[gad7Step] === i && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "white" }} />}
+                      </span>
+                      <span>{opt}</span>
+                      <span style={{ marginLeft: "auto", fontSize: 11, color: "#475569" }}>+{i}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  {gad7Step > 0 && (
+                    <button onClick={() => setGad7Step(s => s - 1)} style={{ flex: 1, padding: 11, background: "#0f172a", border: "1px solid #334155", borderRadius: 11, color: "#64748b", fontSize: 13, cursor: "pointer" }}>← Back</button>
+                  )}
+                  <button onClick={() => {
+                    if (gad7Answers[gad7Step] === null) return;
+                    if (gad7Step === 6) submitGad7();
+                    else setGad7Step(s => s + 1);
+                  }} disabled={gad7Answers[gad7Step] === null} style={{
+                    flex: 2, padding: 11,
+                    background: gad7Answers[gad7Step] !== null ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "#1e293b",
+                    border: "none", borderRadius: 11, color: gad7Answers[gad7Step] !== null ? "white" : "#475569",
+                    fontSize: 13, fontWeight: 600, cursor: gad7Answers[gad7Step] !== null ? "pointer" : "default", transition: "all 0.2s"
+                  }}>
+                    {gad7Step === 6 ? "See Results" : "Next →"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* Result screen */
+              (() => {
+                const score = gad7Answers.reduce((s, a) => s + (a ?? 0), 0);
+                const sev = getGad7Severity(score);
+                const interpretations = {
+                  Minimal: "Your anxiety levels are minimal. Keep up the healthy habits!",
+                  Mild: "Mild anxiety detected. Breathing exercises and regular check-ins can help.",
+                  Moderate: "Moderate anxiety. Consider talking to a trusted person or counsellor.",
+                  Severe: "Significant anxiety. Speaking with a mental health professional is recommended.",
+                };
+                return (
+                  <>
+                    <div style={{ textAlign: "center", marginBottom: 20 }}>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>Your GAD-7 Score</div>
+                      <div style={{ fontSize: 52, fontWeight: 700, color: sev.color, lineHeight: 1 }}>{score}</div>
+                      <div style={{ fontSize: 13, color: "#64748b", marginBottom: 10 }}>out of 21</div>
+                      <span style={{ background: `${sev.color}20`, border: `1px solid ${sev.color}40`, borderRadius: 20, padding: "5px 16px", fontSize: 14, fontWeight: 700, color: sev.color }}>{sev.label} Anxiety</span>
+                    </div>
+                    <div style={{ background: "#0f172a", borderRadius: 11, padding: "12px 14px", marginBottom: 18 }}>
+                      <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>{interpretations[sev.label]}</div>
+                    </div>
+                    <div style={{ background: "#0f172a", borderRadius: 11, padding: "10px 14px", marginBottom: 18 }}>
+                      <div style={{ fontSize: 11, color: "#475569", marginBottom: 6, fontWeight: 500 }}>Score guide</div>
+                      {[["0–4", "Minimal", "#22c55e"], ["5–9", "Mild", "#eab308"], ["10–14", "Moderate", "#f97316"], ["15–21", "Severe", "#ef4444"]].map(([range, label, color]) => (
+                        <div key={label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                          <span style={{ fontSize: 11, color: "#64748b" }}>{range}</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color }}>{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={resetGad7Quiz} style={{ width: "100%", padding: 12, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", border: "none", borderRadius: 11, color: "white", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Done ✓</button>
+                  </>
+                );
+              })()
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Crisis Modal */}
       {showCrisis && (
