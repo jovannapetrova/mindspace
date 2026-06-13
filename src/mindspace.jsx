@@ -59,6 +59,8 @@ const GAD7_QUESTIONS = [
 
 const GAD7_OPTIONS = ["Not at all", "Several days", "More than half the days", "Nearly every day"];
 
+const CHAT_WELCOME = { role: "assistant", content: "Hey! I'm Milo, your personal wellness companion 💙\n\nThis is a safe space — tell me how you're feeling, what's on your mind, or just chat. Everything stays between us." };
+
 function getGad7Severity(score) {
   if (score <= 4) return { label: "Minimal", color: "#22c55e" };
   if (score <= 9) return { label: "Mild", color: "#eab308" };
@@ -102,12 +104,11 @@ export default function MindSpace() {
   const [note, setNote] = useState("");
   const [selectedTags, setSelectedTags] = useState([]);
   const [saved, setSaved] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    { role: "assistant", content: "Hey! I'm Milo, your personal wellness companion 💙\n\nThis is a safe space — tell me how you're feeling, what's on your mind, or just chat. Everything stays between us." }
-  ]);
+  const [chatMessages, setChatMessages] = useState([CHAT_WELCOME]);
   const [chatInput, setChatInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showCrisis, setShowCrisis] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   // GAD-7 state
   const [gad7History, setGad7History] = useState(() => {
@@ -173,7 +174,7 @@ export default function MindSpace() {
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
+  }, [chatMessages, chatOpen]);
 
   function saveEntry() {
     if (!selectedMood) return;
@@ -232,6 +233,12 @@ export default function MindSpace() {
     setWorryFormOpen(false);
     setWorrySaved(true);
     setTimeout(() => setWorrySaved(false), 1500);
+  }
+
+  function startNewChat() {
+    setChatMessages([CHAT_WELCOME]);
+    setChatInput("");
+    setIsLoading(false);
   }
 
   async function sendChat() {
@@ -312,8 +319,8 @@ RULES:
   return (
     <div style={{
       fontFamily: "'Inter', -apple-system, sans-serif",
-      width: "100vw", maxWidth: "100%",
-      minHeight: "100dvh",
+      width: "100%", maxWidth: "100%",
+      height: "100dvh",
       background: "#0f0f1a",
       color: "#e2e8f0",
       display: "flex", flexDirection: "column",
@@ -359,36 +366,10 @@ RULES:
             <div style={{ height: "100%", width: `${Math.min(xpProgress, 100)}%`, background: "linear-gradient(90deg, #6366f1, #8b5cf6)", borderRadius: 2, transition: "width 0.5s" }} />
           </div>
         </div>
-
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #1e293b", overflowX: "auto" }}>
-          {[
-            { id: "home", label: "Today", icon: "🏠" },
-            { id: "quests", label: "Quests", icon: "⚔️", badge: `${todayCompleted}/${todayQuestObjects.length}` },
-            { id: "history", label: "History", icon: "📔" },
-            { id: "chat", label: "Chat", icon: "💬" },
-            { id: "tips", label: "Tips", icon: "💡" },
-            { id: "gad7", label: "Check-in", icon: "📋" },
-            { id: "worry", label: "Worries", icon: "🧩" },
-          ].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              background: "none", border: "none", cursor: "pointer",
-              padding: "8px 10px", fontSize: 12, fontWeight: 500,
-              color: tab === t.id ? "#818cf8" : "#475569",
-              borderBottom: tab === t.id ? "2px solid #818cf8" : "2px solid transparent",
-              marginBottom: -1, transition: "all 0.15s", whiteSpace: "nowrap",
-              display: "flex", alignItems: "center", gap: 4, flexShrink: 0
-            }}>
-              <span>{t.icon}</span>
-              <span>{t.label}</span>
-              {t.badge && <span style={{ background: "#4f46e5", borderRadius: 10, padding: "1px 5px", fontSize: 10, color: "#e0e7ff" }}>{t.badge}</span>}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Scrollable Content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 16px", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
 
         {/* TODAY TAB */}
         {tab === "home" && (
@@ -599,39 +580,6 @@ RULES:
           </div>
         )}
 
-        {/* CHAT TAB */}
-        {tab === "chat" && (
-          <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - 200px)", minHeight: 350 }}>
-            <div style={{ flex: 1, overflowY: "auto", paddingBottom: 8 }}>
-              {chatMessages.map((msg, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: 8 }}>
-                  {msg.role === "assistant" && (
-                    <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, marginRight: 7, marginTop: 2 }}>🧠</div>
-                  )}
-                  <div style={{ maxWidth: "78%", background: msg.role === "user" ? "linear-gradient(135deg, #4f46e5, #7c3aed)" : "#1e293b", borderRadius: msg.role === "user" ? "13px 13px 3px 13px" : "13px 13px 13px 3px", padding: "9px 12px", fontSize: 13, lineHeight: 1.6, color: "#e2e8f0" }}>
-                    {msg.content.split("\n").map((line, j) => <span key={j}>{line}{j < msg.content.split("\n").length - 1 && <br />}</span>)}
-                  </div>
-                </div>
-              ))}
-              {isLoading && (
-                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-                  <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>🧠</div>
-                  <div style={{ background: "#1e293b", borderRadius: "13px 13px 13px 3px", padding: "9px 13px", display: "flex", gap: 4, alignItems: "center" }}>
-                    {[0, 150, 300].map(delay => (
-                      <div key={delay} style={{ width: 5, height: 5, borderRadius: "50%", background: "#6366f1", animation: "bounce 1s infinite", animationDelay: `${delay}ms` }} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-            <div style={{ display: "flex", gap: 7, paddingTop: 8 }}>
-              <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendChat()} placeholder="How are you feeling..." style={{ flex: 1, background: "#1e293b", border: "1px solid #334155", borderRadius: 11, padding: "10px 13px", color: "#e2e8f0", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
-              <button onClick={sendChat} disabled={isLoading || !chatInput.trim()} style={{ background: chatInput.trim() ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "#1e293b", border: "none", borderRadius: 11, padding: "0 15px", cursor: chatInput.trim() ? "pointer" : "default", color: "white", fontSize: 17 }}>→</button>
-            </div>
-          </div>
-        )}
-
         {/* TIPS TAB */}
         {tab === "tips" && (
           <div>
@@ -804,6 +752,116 @@ RULES:
 
       </div>
 
+      {/* Bottom Navigation */}
+      <div style={{
+        display: "flex", flexShrink: 0,
+        borderTop: "1px solid #1e293b",
+        background: "linear-gradient(0deg, #1a1a2e 0%, #0f0f1a 100%)",
+        paddingBottom: "max(env(safe-area-inset-bottom), 6px)"
+      }}>
+        {[
+          { id: "home", label: "Today", icon: "🏠" },
+          { id: "quests", label: "Quests", icon: "⚔️", badge: `${todayCompleted}/${todayQuestObjects.length}` },
+          { id: "history", label: "History", icon: "📔" },
+          { id: "tips", label: "Tips", icon: "💡" },
+          { id: "gad7", label: "Check-in", icon: "📋" },
+          { id: "worry", label: "Worries", icon: "🧩" },
+        ].map(t => {
+          const active = tab === t.id;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              flex: 1, background: "none", border: "none", cursor: "pointer",
+              padding: "7px 1px 5px", display: "flex", flexDirection: "column",
+              alignItems: "center", gap: 3, position: "relative",
+              color: active ? "#818cf8" : "#475569", transition: "color 0.15s",
+              borderTop: active ? "2px solid #818cf8" : "2px solid transparent",
+              marginTop: -1
+            }}>
+              <span style={{ fontSize: 19, lineHeight: 1, position: "relative" }}>
+                {t.icon}
+                {t.badge && (
+                  <span style={{
+                    position: "absolute", top: -5, left: "100%", marginLeft: -8,
+                    background: "#4f46e5", borderRadius: 9, padding: "0px 4px",
+                    fontSize: 8, fontWeight: 700, color: "#e0e7ff", lineHeight: "13px"
+                  }}>{t.badge}</span>
+                )}
+              </span>
+              <span style={{ fontSize: 9, fontWeight: 500, whiteSpace: "nowrap" }}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Floating Chat Bubble (FAB) */}
+      {!chatOpen && (
+        <button onClick={() => setChatOpen(true)} aria-label="Chat with Milo" style={{
+          position: "absolute", right: 16,
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 72px)",
+          width: 56, height: 56, borderRadius: "50%", border: "none", cursor: "pointer",
+          background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+          boxShadow: "0 6px 22px rgba(99,102,241,0.55)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 24, zIndex: 80, transition: "transform 0.15s"
+        }}>💬</button>
+      )}
+
+      {/* Floating Chat Panel */}
+      {chatOpen && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 90 }}>
+          <div onClick={() => setChatOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} />
+          <div style={{
+            position: "absolute", left: 10, right: 10,
+            top: 58, bottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
+            display: "flex", flexDirection: "column",
+            background: "#0f0f1a", border: "1px solid #1e293b", borderRadius: 18,
+            boxShadow: "0 12px 44px rgba(0,0,0,0.6)", overflow: "hidden"
+          }}>
+            {/* Panel header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 13px", borderBottom: "1px solid #1e293b", background: "linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%)", flexShrink: 0 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🧠</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0" }}>Milo</div>
+                <div style={{ fontSize: 10, color: "#22c55e", display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />Your companion</div>
+              </div>
+              <button onClick={startNewChat} disabled={isLoading || chatMessages.length <= 1} aria-label="Start a new chat" title="New chat" style={{ display: "flex", alignItems: "center", gap: 4, background: "#1e293b", border: "1px solid #334155", borderRadius: 9, padding: "0 10px", height: 30, color: chatMessages.length <= 1 ? "#475569" : "#a5b4fc", fontSize: 12, fontWeight: 600, cursor: chatMessages.length <= 1 ? "default" : "pointer" }}>＋ New</button>
+              <button onClick={() => setChatOpen(false)} aria-label="Close chat" style={{ background: "#1e293b", border: "none", borderRadius: 9, width: 30, height: 30, color: "#94a3b8", fontSize: 15, cursor: "pointer" }}>✕</button>
+            </div>
+
+            {/* Messages */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "12px 13px" }}>
+              {chatMessages.map((msg, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: 8 }}>
+                  {msg.role === "assistant" && (
+                    <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, marginRight: 7, marginTop: 2 }}>🧠</div>
+                  )}
+                  <div style={{ maxWidth: "78%", background: msg.role === "user" ? "linear-gradient(135deg, #4f46e5, #7c3aed)" : "#1e293b", borderRadius: msg.role === "user" ? "13px 13px 3px 13px" : "13px 13px 13px 3px", padding: "9px 12px", fontSize: 13, lineHeight: 1.6, color: "#e2e8f0" }}>
+                    {msg.content.split("\n").map((line, j) => <span key={j}>{line}{j < msg.content.split("\n").length - 1 && <br />}</span>)}
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+                  <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>🧠</div>
+                  <div style={{ background: "#1e293b", borderRadius: "13px 13px 13px 3px", padding: "9px 13px", display: "flex", gap: 4, alignItems: "center" }}>
+                    {[0, 150, 300].map(delay => (
+                      <div key={delay} style={{ width: 5, height: 5, borderRadius: "50%", background: "#6366f1", animation: "bounce 1s infinite", animationDelay: `${delay}ms` }} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Input */}
+            <div style={{ display: "flex", gap: 7, padding: "10px 12px", borderTop: "1px solid #1e293b", flexShrink: 0 }}>
+              <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendChat()} placeholder="How are you feeling..." style={{ flex: 1, background: "#1e293b", border: "1px solid #334155", borderRadius: 11, padding: "10px 13px", color: "#e2e8f0", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+              <button onClick={sendChat} disabled={isLoading || !chatInput.trim()} style={{ background: chatInput.trim() ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "#1e293b", border: "none", borderRadius: 11, padding: "0 15px", cursor: chatInput.trim() ? "pointer" : "default", color: "white", fontSize: 17 }}>→</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* GAD-7 Quiz Modal */}
       {showGad7Quiz && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", zIndex: 100 }}>
@@ -927,8 +985,10 @@ RULES:
       <style>{`
         @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-4px); } }
         @keyframes fadeUp { 0% { opacity: 1; transform: translateX(-50%) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         textarea::placeholder, input::placeholder { color: #334155; }
+        /* Keep text fields >=16px so mobile Safari doesn't zoom on focus */
+        textarea, input:not([type="range"]) { font-size: 16px !important; }
         ::-webkit-scrollbar { width: 3px; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
         html, body { height: 100%; overflow: hidden; background: #0f0f1a; }
