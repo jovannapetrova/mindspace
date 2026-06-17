@@ -1,998 +1,376 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-const MOODS = [
-  { id: 5, emoji: "😄", label: "Great", color: "#22c55e", bg: "#f0fdf4" },
-  { id: 4, emoji: "🙂", label: "Good", color: "#84cc16", bg: "#f7fee7" },
-  { id: 3, emoji: "😐", label: "Okay", color: "#eab308", bg: "#fefce8" },
-  { id: 2, emoji: "😔", label: "Low", color: "#f97316", bg: "#fff7ed" },
-  { id: 1, emoji: "😢", label: "Rough", color: "#ef4444", bg: "#fef2f2" },
-];
-
-const TAGS = [
-  "stress", "school", "friends", "family", "sports",
-  "sleep", "food", "loneliness", "anxiety", "joy",
-  "motivation", "tired", "love", "work", "hobbies"
-];
-
-const TIPS = [
-  { icon: "🌬️", title: "4-7-8 Breathing", desc: "Inhale 4s, hold 7s, exhale 8s. Repeat 3-4 times to calm down instantly." },
-  { icon: "🚶", title: "5-Minute Walk", desc: "A short walk outside resets your thoughts and lowers cortisol levels." },
-  { icon: "📵", title: "Digital Detox", desc: "Leave your phone 30 minutes before sleep for better rest quality." },
-  { icon: "💧", title: "Hydration", desc: "Dehydration directly affects mood. Drink a glass of water right now." },
-  { icon: "🎵", title: "Music Therapy", desc: "Play your favourite song. Music changes brain chemistry in just 3 minutes." },
-  { icon: "✍️", title: "Gratitude List", desc: "Each evening write 3 things you're grateful for — rewires your brain." },
-  { icon: "🧘", title: "Body Scan", desc: "Close your eyes, notice where you feel tension, breathe into that spot." },
-  { icon: "🌿", title: "Nature Break", desc: "Even 10 minutes near trees or grass reduces anxiety by 20% (HBSC data)." },
-];
-
-const CRISIS_RESOURCES = [
-  { name: "SOS Line Macedonia", number: "0800 1 2345", available: "24/7 free", flag: "🇲🇰" },
-  { name: "Mental Health Centre", number: "02 3109 774", available: "Mon-Fri 8-20h", flag: "🇲🇰" },
-  { name: "Youth Support Line", number: "0800 77 000", available: "24/7 free", flag: "🇲🇰" },
-];
-
-// HBSC-inspired daily quests
-const ALL_QUESTS = [
-  { id: "q1", icon: "🚶", title: "Move for 30 min", desc: "HBSC: Only 20% of teens meet daily activity goals. Beat the statistic!", xp: 30, category: "physical" },
-  { id: "q2", icon: "🛌", title: "Sleep 8+ hours tonight", desc: "HBSC: 40% of teens sleep less than 8 hours. Plan your bedtime tonight.", xp: 25, category: "sleep" },
-  { id: "q3", icon: "📵", title: "1 hour screen-free", desc: "HBSC: Teens average 6+ hours of screen time daily. Take a real break.", xp: 20, category: "digital" },
-  { id: "q4", icon: "💬", title: "Talk to a friend today", desc: "HBSC: Social connection is the #1 predictor of teen wellbeing.", xp: 15, category: "social" },
-  { id: "q5", icon: "🥗", title: "Eat a fruit or vegetable", desc: "HBSC: 68% of teens skip fruits/vegetables daily. Choose better today.", xp: 10, category: "nutrition" },
-  { id: "q6", icon: "🌬️", title: "Do the 4-7-8 breathing", desc: "Spend 5 minutes on mindful breathing to reset your nervous system.", xp: 15, category: "mental" },
-  { id: "q7", icon: "✍️", title: "Write 3 grateful things", desc: "Gratitude journaling reduces anxiety by up to 27% over 8 weeks.", xp: 15, category: "mental" },
-  { id: "q8", icon: "🌿", title: "Spend time in nature", desc: "HBSC: Teens who spend time outdoors report 35% better mental health.", xp: 20, category: "physical" },
-  { id: "q9", icon: "📚", title: "Read for 20 minutes", desc: "Reading reduces stress by 68% within 6 minutes (Sussex University).", xp: 15, category: "mental" },
-  { id: "q10", icon: "💧", title: "Drink 8 glasses of water", desc: "Mild dehydration causes mood drops and concentration issues.", xp: 10, category: "nutrition" },
-  { id: "q11", icon: "🎨", title: "Do something creative", desc: "Draw, write, play music — creative expression boosts dopamine.", xp: 20, category: "mental" },
-  { id: "q12", icon: "🤝", title: "Help someone today", desc: "HBSC: Acts of kindness improve the giver's mood for up to 24 hours.", xp: 25, category: "social" },
-];
-
-const GAD7_QUESTIONS = [
-  "Feeling nervous, anxious, or on edge",
-  "Not being able to stop or control worrying",
-  "Worrying too much about different things",
-  "Trouble relaxing",
-  "Being so restless that it is hard to sit still",
-  "Becoming easily annoyed or irritable",
-  "Feeling afraid, as if something awful might happen",
-];
-
-const GAD7_OPTIONS = ["Not at all", "Several days", "More than half the days", "Nearly every day"];
-
-const CHAT_WELCOME = { role: "assistant", content: "Hey! I'm Milo, your personal wellness companion 💙\n\nThis is a safe space — tell me how you're feeling, what's on your mind, or just chat. Everything stays between us." };
-
-function getGad7Severity(score) {
-  if (score <= 4) return { label: "Minimal", color: "#22c55e" };
-  if (score <= 9) return { label: "Mild", color: "#eab308" };
-  if (score <= 14) return { label: "Moderate", color: "#f97316" };
-  return { label: "Severe", color: "#ef4444" };
-}
-
-const CATEGORY_COLORS = {
-  physical: "#22c55e",
-  sleep: "#8b5cf6",
-  digital: "#f97316",
-  social: "#3b82f6",
-  nutrition: "#eab308",
-  mental: "#6366f1",
+const COLORS = {
+  cream: "#FFFBF2",
+  white: "#FFFFFF",
+  coral: "#FF6F61",
+  coralDark: "#E85A4F",
+  text: "#24212B",
+  muted: "#746B7E",
+  line: "#EFE4D6",
+  amber: "#FFE7A8",
+  mint: "#B9F2E5",
+  lavender: "#DCD3FF",
+  pink: "#FFD6E0",
+  green: "#CFF7D3",
+  sky: "#CDEBFF",
+  blue: "#AFCBFF",
 };
 
-const LEVELS = [
-  { level: 1, title: "Newcomer", minXp: 0, maxXp: 100 },
-  { level: 2, title: "Explorer", minXp: 100, maxXp: 250 },
-  { level: 3, title: "Seeker", minXp: 250, maxXp: 450 },
-  { level: 4, title: "Grower", minXp: 450, maxXp: 700 },
-  { level: 5, title: "Achiever", minXp: 700, maxXp: 1000 },
-  { level: 6, title: "Wellness Pro", minXp: 1000, maxXp: 1400 },
-  { level: 7, title: "Mind Master", minXp: 1400, maxXp: 9999 },
+const MOODS = [
+  { id: "great", emoji: "😄", mk: "Одлично", color: "#22C55E", score: 5, advice: ["Продолжи со тоа што денес ти носи енергија.", "Запиши што ти помогна денес — ќе ти користи и утре.", "Сподели мала добра работа со некој близок."] },
+  { id: "calm", emoji: "🙂", mk: "Мирно", color: "#14B8A6", score: 4, advice: ["Ова е добар момент за кратка прошетка или омилена песна.", "Зачувај ја оваа рутина — мирните денови се важни.", "Направи нешто креативно 5 минути."] },
+  { id: "okay", emoji: "😐", mk: "Океј", color: "#EAB308", score: 3, advice: ["Избери една мала задача и заврши ја без притисок.", "Океј ден е сосема валиден ден.", "Пробај 2 минути фокус игра за полесен старт."] },
+  { id: "sad", emoji: "😔", mk: "Тажно", color: "#8B5CF6", score: 2, advice: ["Напиши 3 мали работи што барем малку биле добри.", "Прати порака на личност на која ѝ веруваш.", "Пробај топла порака или нежна музика."] },
+  { id: "stress", emoji: "😟", mk: "Стрес", color: "#EF4444", score: 1, advice: ["Пробај 4 бавни вдишувања и пауза од екранот.", "Подели ја задачата на најмал следен чекор.", "Направи дишечка вежба 2 минути."] },
+  { id: "confidence", emoji: "🌟", mk: "Самодоверба", color: "#F97316", score: 4, advice: ["Напиши една работа што денес ја направи добро.", "Не мора да биде совршено — важно е што пробуваш.", "Кажи си: 'Можам да одам чекор по чекор'."] },
 ];
 
-function getLevelInfo(xp) {
-  return LEVELS.find((l, i) => xp >= l.minXp && (i === LEVELS.length - 1 || xp < LEVELS[i + 1].minXp)) || LEVELS[0];
+const WARM_MESSAGES = [
+  "Денес не мора да бидеш совршена/совршен — доволно е да бидеш присутна/присутен.",
+  "Еден мал чекор е сепак напредок.",
+  "Ти вредиш и кога денот не оди по план.",
+  "Пауза не е откажување, пауза е грижа за себе.",
+  "Денес избери нешто нежно за себе.",
+  "Не мора сè да решиш одеднаш.",
+  "Твоите чувства имаат смисла, дури и кога се збунувачки.",
+  "Почни со најмалата можна добра одлука.",
+  "Добро е да побараш помош кога ти треба.",
+  "И тешките денови поминуваат.",
+  "Диши бавно — телото сака знак дека си безбедно.",
+  "Ти си повеќе од еден лош момент.",
+  "Денес пробај да бидеш свој најдобар другар.",
+  "Не споредувај го твојот ден со туѓ highlight.",
+  "Малку вода, малку воздух, малку пауза — почеток е.",
+  "Секоја нова навика почнува со една мала повторена работа.",
+  "Можеш да кажеш 'не' без да бидеш лоша/лош.",
+  "Твоето темпо е валидно.",
+  "Не си сама/сам во тоа што го чувствуваш.",
+  "Напредокот понекогаш изгледа како одмор.",
+  "Денес најди една мала причина за насмевка.",
+  "Ти не си твојата грешка.",
+  "Смирен разговор може да реши повеќе од брза реакција.",
+  "Секој ден е нова шанса да се грижиш за себе.",
+  "Малите победи се вистински победи.",
+  "Кога е многу, врати се на едноставно: диши, вода, чекор.",
+  "Ти е дозволено да растеш полека.",
+  "Добрина кон себе не е слабост.",
+  "Денес пробај да забележиш што ти помогна.",
+  "Сè што чувствуваш може да се каже со свои зборови.",
+  "Утре може да биде полесно, а денес само направи мал чекор.",
+];
+
+const ACTIVITIES = [
+  { id: "breath", icon: "🌬️", title: "Дишечка вежба", time: "2 мин", bg: COLORS.mint },
+  { id: "balloon", icon: "🎈", title: "Следи го балонот", time: "1 мин", bg: COLORS.lavender },
+  { id: "gratitude", icon: "✨", title: "Благодарна листа", time: "3 мин", bg: COLORS.pink },
+  { id: "scenario", icon: "🧩", title: "Сценарио избор", time: "3 мин", bg: COLORS.green },
+  { id: "memory", icon: "🃏", title: "Меморија парови", time: "2 мин", bg: COLORS.sky },
+  { id: "sort", icon: "📦", title: "Сортирај мисли", time: "3 мин", bg: COLORS.amber },
+  { id: "tap", icon: "⚡", title: "Брз фокус", time: "45 сек", bg: COLORS.blue },
+  { id: "colors", icon: "🎨", title: "Најди ја бојата", time: "1 мин", bg: COLORS.pink },
+  { id: "kind", icon: "💌", title: "Топла порака", time: "1 мин", bg: COLORS.green },
+  { id: "confidence", icon: "🌟", title: "Самодоверба чекор", time: "2 мин", bg: COLORS.amber },
+];
+
+const EXTRA_TIPS = [
+  "Кога си под стрес, прво смири го телото, па решавај го проблемот.",
+  "Кога си тажна/тажен, не мора веднаш да се развеселиш — само направи нешто нежно.",
+  "За фокус: 10 минути работа + 2 минути пауза е подобро од ништо.",
+  "За самодоверба: запиши доказ дека си успеала/успеал барем во нешто мало.",
+  "За пријателства: користи реченици со 'Јас се почувствував...' наместо обвинување.",
+  "За сон: направи еден мал вечерен ритуал што се повторува.",
+  "За мотивација: почни со задача што трае помалку од 5 минути.",
+  "За дигитална рамнотежа: остави телефон 15 минути и забележи како се чувствуваш.",
+];
+
+function load(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
+}
+function save(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+function dayKey(date = new Date()) {
+  return new Date(date).toISOString().slice(0, 10);
+}
+function formatStreak(n) {
+  if (n === 1) return "1 ден по ред";
+  return `${n} денови по ред`;
+}
+function getStreak(entries) {
+  const unique = new Set(entries.map(e => dayKey(e.date)));
+  let count = 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    if (unique.has(dayKey(d))) count += 1;
+    else break;
+  }
+  return count;
+}
+function todayWarmMessage() {
+  const d = new Date().getDate();
+  return WARM_MESSAGES[(d - 1) % WARM_MESSAGES.length];
 }
 
-function formatDate(d) {
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+async function askGemini(text, history) {
+  const key = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!key) throw new Error("Нема VITE_GEMINI_API_KEY во .env");
+  const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  let lastError = "";
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          { role: "user", parts: [{ text: "Ти си Другар AI, топол wellness асистент за млади. Одговарај кратко, на македонски, практично и без дијагнози." }] },
+          ...history.slice(-6).map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+          { role: "user", parts: [{ text }] },
+        ],
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return data?.candidates?.[0]?.content?.parts?.[0]?.text || "Не добив текст од Gemini.";
+    lastError = `Gemini ${model}: ${res.status} ${data?.error?.message || res.statusText}`;
+    if (res.status !== 404) break;
+  }
+  throw new Error(lastError || "Gemini не одговори.");
+}
+
+async function askOpenAI(text, history) {
+  const key = import.meta.env.VITE_OPENAI_API_KEY;
+  if (!key) throw new Error("Нема VITE_OPENAI_API_KEY во .env");
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Ти си Другар AI, топол wellness асистент за млади. Одговарај кратко, на македонски, практично и без дијагнози." },
+        ...history.slice(-8),
+        { role: "user", content: text },
+      ],
+      max_tokens: 350,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${data?.error?.message || res.statusText}`);
+  return data?.choices?.[0]?.message?.content || "Не добив текст од OpenAI.";
+}
+
+function localReply(text) {
+  const v = text.toLowerCase();
+  if (v.includes("стрес") || v.includes("нерв") || v.includes("stress")) return "Изгледа дека денес има напнатост. Пробај 4 бавни вдишувања, па избери само еден мал следен чекор. Не мора сè да решиш одеднаш.";
+  if (v.includes("таж") || v.includes("осамен") || v.includes("sad")) return "Жал ми е што ти е тешко. Напиши една мала работа што ти донесе барем малку мир, или јави се на личност на која ѝ веруваш.";
+  if (v.includes("самодовер") || v.includes("confidence")) return "Самодовербата се гради со докази. Запиши една мала работа што ја направи добро денес, колку и да изгледа мала.";
+  return "Те слушам. Кажи ми уште малку што се случи, а во меѓувреме пробај еден мал чекор: вода, дишење или кратка пауза.";
 }
 
 export default function MindSpace() {
+  const [screen, setScreen] = useState("splash");
+  const [authMode, setAuthMode] = useState("login");
+  const [auth, setAuth] = useState({ name: "", email: "", pass: "", pass2: "" });
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(() => load("ms_profile_v7", { nick: "Јована", avatar: "🦊" }));
+  const [entries, setEntries] = useState(() => load("ms_entries_v7", []));
+  const [gratitudes, setGratitudes] = useState(() => load("ms_gratitudes_v7", []));
+  const [xp, setXp] = useState(() => load("ms_xp_v7", 0));
   const [tab, setTab] = useState("home");
-  const [entries, setEntries] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("ms_entries") || "[]"); } catch { return []; }
-  });
   const [selectedMood, setSelectedMood] = useState(null);
-  const [note, setNote] = useState("");
-  const [selectedTags, setSelectedTags] = useState([]);
-  const [saved, setSaved] = useState(false);
-  const [chatMessages, setChatMessages] = useState([CHAT_WELCOME]);
-  const [chatInput, setChatInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [showCrisis, setShowCrisis] = useState(false);
+  const [result, setResult] = useState(null);
+  const [game, setGame] = useState(null);
+  const [toast, setToast] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState([{ role: "assistant", content: "Здраво, јас сум Другар AI. Кажи ми што ти е на ум 💛" }]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const chatEnd = useRef(null);
 
-  // GAD-7 state
-  const [gad7History, setGad7History] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("ms_gad7") || "[]"); } catch { return []; }
-  });
-  const [showGad7Quiz, setShowGad7Quiz] = useState(false);
-  const [gad7Step, setGad7Step] = useState(0);
-  const [gad7Answers, setGad7Answers] = useState(Array(7).fill(null));
+  useEffect(() => { const id = setTimeout(() => setScreen("auth"), 1800); return () => clearTimeout(id); }, []);
+  useEffect(() => save("ms_entries_v7", entries), [entries]);
+  useEffect(() => save("ms_gratitudes_v7", gratitudes), [gratitudes]);
+  useEffect(() => save("ms_xp_v7", xp), [xp]);
+  useEffect(() => save("ms_profile_v7", profile), [profile]);
+  useEffect(() => chatEnd.current?.scrollIntoView({ behavior: "smooth" }), [chatMessages, chatOpen]);
 
-  // Worry Journal state
-  const [worryEntries, setWorryEntries] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("ms_worries") || "[]"); } catch { return []; }
-  });
-  const [worryForm, setWorryForm] = useState({ worry: "", likelihood: 5, worst: "", best: "", realistic: "" });
-  const [worryFormOpen, setWorryFormOpen] = useState(false);
-  const [worrySaved, setWorrySaved] = useState(false);
-
-  // Quest / game state
-  const [xp, setXp] = useState(() => {
-    try { return parseInt(localStorage.getItem("ms_xp") || "0"); } catch { return 0; }
-  });
-  const [completedQuests, setCompletedQuests] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("ms_quests") || "{}"); } catch { return {}; }
-  });
-  const [xpPopup, setXpPopup] = useState(null);
-  const [dailyQuests, setDailyQuests] = useState(() => {
-    const today = new Date().toDateString();
-    try {
-      const saved = JSON.parse(localStorage.getItem("ms_daily_quests") || "null");
-      if (saved && saved.date === today) return saved.quests;
-    } catch {}
-    // Pick 4 random quests for today
-    const shuffled = [...ALL_QUESTS].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 4).map(q => q.id);
-  });
-
-  const chatEndRef = useRef(null);
-
-  useEffect(() => {
-    try { localStorage.setItem("ms_entries", JSON.stringify(entries)); } catch {}
+  const streak = useMemo(() => getStreak(entries), [entries]);
+  const last7 = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      const dayEntries = entries.filter(e => dayKey(e.date) === dayKey(d));
+      const avg = dayEntries.length ? dayEntries.reduce((s, e) => s + e.score, 0) / dayEntries.length : 0;
+      return { date: d, avg, count: dayEntries.length };
+    });
   }, [entries]);
 
-  useEffect(() => {
-    try { localStorage.setItem("ms_xp", String(xp)); } catch {}
-  }, [xp]);
-
-  useEffect(() => {
-    try { localStorage.setItem("ms_quests", JSON.stringify(completedQuests)); } catch {}
-  }, [completedQuests]);
-
-  useEffect(() => {
-    const today = new Date().toDateString();
-    try { localStorage.setItem("ms_daily_quests", JSON.stringify({ date: today, quests: dailyQuests })); } catch {}
-  }, [dailyQuests]);
-
-  useEffect(() => {
-    try { localStorage.setItem("ms_gad7", JSON.stringify(gad7History)); } catch {}
-  }, [gad7History]);
-
-  useEffect(() => {
-    try { localStorage.setItem("ms_worries", JSON.stringify(worryEntries)); } catch {}
-  }, [worryEntries]);
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages, chatOpen]);
-
-  function saveEntry() {
-    if (!selectedMood) return;
-    const entry = { id: Date.now(), mood: selectedMood, note, tags: selectedTags, date: new Date().toISOString() };
-    setEntries(prev => [entry, ...prev].slice(0, 90));
-    // Award XP for logging mood
-    awardXP(5, "Mood logged +5 XP");
-    setSaved(true);
-    setTimeout(() => {
-      setSaved(false); setSelectedMood(null); setNote(""); setSelectedTags([]);
-      setTab("history");
-    }, 1400);
+  function loginDemo(provider = "email") {
+    setUser({ email: auth.email || `${provider}@demo.local`, name: auth.name || profile.nick });
+    setScreen("app");
   }
-
-  function awardXP(amount, label) {
-    setXp(prev => prev + amount);
-    setXpPopup(label);
-    setTimeout(() => setXpPopup(null), 2000);
+  function register() {
+    if (!auth.name || !auth.email || !auth.pass || auth.pass !== auth.pass2) {
+      setToast("Провери име, е-пошта и лозинки.");
+      setTimeout(() => setToast(""), 1600);
+      return;
+    }
+    const users = load("ms_users_v7", {});
+    users[auth.email] = { name: auth.name, pass: auth.pass };
+    save("ms_users_v7", users);
+    setProfile(p => ({ ...p, nick: auth.name }));
+    setToast("Профилот е креиран. Сега најави се.");
+    setAuthMode("login");
+    setTimeout(() => setToast(""), 1600);
   }
-
-  function completeQuest(questId) {
-    const today = new Date().toDateString();
-    const key = `${questId}_${today}`;
-    if (completedQuests[key]) return;
-    const quest = ALL_QUESTS.find(q => q.id === questId);
-    setCompletedQuests(prev => ({ ...prev, [key]: true }));
-    awardXP(quest.xp, `+${quest.xp} XP earned!`);
+  function loginWithPassword() {
+    const users = load("ms_users_v7", {});
+    if (!users[auth.email] || users[auth.email].pass !== auth.pass) {
+      setToast("Е-поштата или лозинката не се точни.");
+      setTimeout(() => setToast(""), 1600);
+      return;
+    }
+    setProfile(p => ({ ...p, nick: users[auth.email].name || p.nick }));
+    loginDemo("email");
   }
-
-  function isQuestDoneToday(questId) {
-    const today = new Date().toDateString();
-    return !!completedQuests[`${questId}_${today}`];
+  function logout() {
+    setUser(null);
+    setScreen("auth");
+    setTab("home");
+    setSelectedMood(null);
   }
-
-  function submitGad7() {
-    const score = gad7Answers.reduce((s, a) => s + (a ?? 0), 0);
-    const severity = getGad7Severity(score);
-    const entry = { id: Date.now(), date: new Date().toISOString(), score, severity: severity.label, answers: [...gad7Answers] };
-    setGad7History(prev => [entry, ...prev].slice(0, 20));
-    awardXP(20, "GAD-7 completed +20 XP");
-    setGad7Step(7);
+  function addXP(amount, label) {
+    setXp(v => v + amount);
+    setToast(label);
+    setTimeout(() => setToast(""), 1400);
   }
-
-  function resetGad7Quiz() {
-    setGad7Answers(Array(7).fill(null));
-    setGad7Step(0);
-    setShowGad7Quiz(false);
+  function saveMood(moodId) {
+    const mood = MOODS.find(m => m.id === moodId);
+    if (!mood) return;
+    const entry = { id: Date.now(), date: new Date().toISOString(), mood: mood.id, score: mood.score };
+    setEntries(prev => [entry, ...prev].slice(0, 200));
+    setResult({ type: "mood", mood: mood.id, advice: mood.advice[Math.floor(Math.random() * mood.advice.length)] });
+    addXP(10, "+10 XP за внесено чувство");
+    setScreen("result");
   }
-
-  function saveWorry() {
-    if (!worryForm.worry.trim()) return;
-    const entry = { id: Date.now(), date: new Date().toISOString(), ...worryForm };
-    setWorryEntries(prev => [entry, ...prev].slice(0, 50));
-    awardXP(10, "Worry logged +10 XP");
-    setWorryForm({ worry: "", likelihood: 5, worst: "", best: "", realistic: "" });
-    setWorryFormOpen(false);
-    setWorrySaved(true);
-    setTimeout(() => setWorrySaved(false), 1500);
-  }
-
-  function startNewChat() {
-    setChatMessages([CHAT_WELCOME]);
-    setChatInput("");
-    setIsLoading(false);
-  }
-
   async function sendChat() {
-    if (!chatInput.trim() || isLoading) return;
-    const userMsg = chatInput.trim();
+    const msg = chatInput.trim();
+    if (!msg || aiLoading) return;
     setChatInput("");
-    const newMessages = [...chatMessages, { role: "user", content: userMsg }];
-    setChatMessages(newMessages);
-    setIsLoading(true);
-    const messages = [
-      { role: "system", content: `You are Milo, an empathetic wellness assistant for young people (11-18 years old). Your role is emotional support, NOT medical diagnosis.
-
-RULES:
-- Always respond in English
-- Be warm, non-intrusive, understanding
-- Use simple language appropriate for teenagers
-- Never minimise feelings
-- Suggest concrete, small steps (breathing, a pause, talking to someone close)
-- If you notice serious signs of crisis (self-harm, suicidal thoughts), gently refer to professional help and mention the SOS line 0800 1 2345 (Macedonia)
-- Keep responses short (3-6 sentences) unless the situation requires more
-- Occasionally ask one open question to continue the conversation
-- Don't be robotic — be natural, warm
-- You can use emoji sparingly (1-2 per message)` },
-      ...newMessages.map(m => ({ role: m.role, content: m.content }))
-    ];
+    const next = [...chatMessages, { role: "user", content: msg }];
+    setChatMessages(next);
+    setAiLoading(true);
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          max_tokens: 1000,
-          messages
-        })
-      });
-      const data = await res.json();
-      const reply = data.choices?.[0]?.message?.content || "Sorry, something went wrong. Please try again.";
+      let reply;
+      if (import.meta.env.VITE_GEMINI_API_KEY) reply = await askGemini(msg, next);
+      else if (import.meta.env.VITE_OPENAI_API_KEY) reply = await askOpenAI(msg, next);
+      else reply = localReply(msg);
       setChatMessages(prev => [...prev, { role: "assistant", content: reply }]);
-    } catch {
-      setChatMessages(prev => [...prev, { role: "assistant", content: "Oops, connection issue. Try again in a moment! 🔄" }]);
+    } catch (e) {
+      setChatMessages(prev => [...prev, { role: "assistant", content: `${e.message}\n\nFallback: ${localReply(msg)}` }]);
     }
-    setIsLoading(false);
+    setAiLoading(false);
   }
 
-  const avgMood = entries.length
-    ? (entries.slice(0, 7).reduce((s, e) => s + e.mood, 0) / Math.min(entries.length, 7)).toFixed(1)
-    : null;
+  if (screen === "splash") return <div style={styles.page}><div style={styles.center}><Buddy size={108} /><h1 style={styles.logo}>Мој Другар</h1><p style={styles.muted}>За твоето добро расположение 🌤️</p></div></div>;
 
-  const moodCounts = MOODS.map(m => ({ ...m, count: entries.filter(e => e.mood === m.id).length }));
+  if (screen === "auth") return <div style={styles.page}>{toast && <Toast>{toast}</Toast>}<div style={{ maxWidth: 520, margin: "45px auto" }}><Card><Buddy /><h1 style={styles.title}>{authMode === "login" ? "Добре дојде назад 👋" : "Да се запознаеме 🌱"}</h1>{authMode === "register" && <Input placeholder="Име" value={auth.name} onChange={v => setAuth({ ...auth, name: v })} />}<Input placeholder="Е-пошта" value={auth.email} onChange={v => setAuth({ ...auth, email: v })} /><Input type="password" placeholder="Лозинка" value={auth.pass} onChange={v => setAuth({ ...auth, pass: v })} />{authMode === "register" && <Input type="password" placeholder="Потврди лозинка" value={auth.pass2} onChange={v => setAuth({ ...auth, pass2: v })} />}<Button onClick={authMode === "login" ? loginWithPassword : register}>{authMode === "login" ? "Најави се" : "Создај профил"}</Button><p style={styles.or}>или</p><Button ghost onClick={() => loginDemo("google")}>Продолжи со Google</Button><Button ghost onClick={() => loginDemo("apple")}>Продолжи со Apple</Button><p style={styles.textSmall}>{authMode === "login" ? "Немаш профил? " : "Веќе имаш профил? "}<button style={styles.link} onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}>{authMode === "login" ? "Регистрирај се" : "Најави се"}</button></p></Card></div></div>;
 
-  const streakDays = (() => {
-    if (!entries.length) return 0;
-    let streak = 0;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    for (let i = 0; i < 30; i++) {
-      const d = new Date(today); d.setDate(d.getDate() - i);
-      const has = entries.some(e => { const ed = new Date(e.date); ed.setHours(0,0,0,0); return ed.getTime() === d.getTime(); });
-      if (has) streak++; else if (i > 0) break;
-    }
-    return streak;
-  })();
+  if (screen === "result") {
+    const mood = MOODS.find(m => m.id === result?.mood) || MOODS[2];
+    const randomTip = EXTRA_TIPS[(Date.now() + mood.score) % EXTRA_TIPS.length];
+    return <div style={styles.page}>{toast && <Toast>{toast}</Toast>}<Header title="Резултат" onBack={() => setScreen("app")} /><Buddy mood={mood.id} /><Card><h2>Денес избра: <span style={{ color: mood.color }}>{mood.emoji} {mood.mk}</span></h2><p style={styles.text}>{result?.advice}</p></Card><Card><h2>Уште еден совет</h2><p style={styles.text}>{randomTip}</p></Card><Card style={{ background: COLORS.amber }}><h2>Предлог активност</h2><p>{mood.id === "stress" ? "🌬️ Дишечка вежба" : mood.id === "sad" ? "✨ Благодарна листа" : mood.id === "confidence" ? "🌟 Самодоверба чекор" : "🎈 Следи го балонот"}</p><Button onClick={() => { setGame(mood.id === "stress" ? "breath" : mood.id === "sad" ? "gratitude" : mood.id === "confidence" ? "confidence" : "balloon"); setScreen("game"); }}>Започни</Button></Card><Button ghost onClick={() => setChatOpen(true)}>Сподели со Другар AI</Button>{chatOpen && <Chat chatMessages={chatMessages} chatInput={chatInput} setChatInput={setChatInput} sendChat={sendChat} loading={aiLoading} close={() => setChatOpen(false)} chatEnd={chatEnd} />}</div>;
+  }
 
-  const last7 = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i)); d.setHours(0, 0, 0, 0);
-    const entry = entries.find(e => { const ed = new Date(e.date); ed.setHours(0,0,0,0); return ed.getTime() === d.getTime(); });
-    return { date: d, entry };
-  });
+  if (screen === "game") return <Game game={game} setScreen={setScreen} addXP={addXP} gratitudes={gratitudes} setGratitudes={setGratitudes} />;
 
-  const levelInfo = getLevelInfo(xp);
-  const nextLevel = LEVELS[LEVELS.findIndex(l => l.level === levelInfo.level) + 1];
-  const xpProgress = nextLevel ? ((xp - levelInfo.minXp) / (nextLevel.minXp - levelInfo.minXp)) * 100 : 100;
-  const todayQuestObjects = dailyQuests.map(id => ALL_QUESTS.find(q => q.id === id)).filter(Boolean);
-  const todayCompleted = todayQuestObjects.filter(q => isQuestDoneToday(q.id)).length;
-
-  return (
-    <div style={{
-      fontFamily: "'Inter', -apple-system, sans-serif",
-      width: "100%", maxWidth: "100%",
-      height: "100dvh",
-      background: "#0f0f1a",
-      color: "#e2e8f0",
-      display: "flex", flexDirection: "column",
-      position: "relative", overflow: "hidden"
-    }}>
-
-      {/* XP Popup */}
-      {xpPopup && (
-        <div style={{
-          position: "fixed", top: 70, left: "50%", transform: "translateX(-50%)",
-          background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-          color: "white", padding: "8px 20px", borderRadius: 20,
-          fontWeight: 700, fontSize: 14, zIndex: 200,
-          animation: "fadeUp 2s ease forwards", pointerEvents: "none"
-        }}>{xpPopup}</div>
-      )}
-
-      {/* Header */}
-      <div style={{ padding: "env(safe-area-inset-top, 12px) 16px 0", paddingTop: "max(env(safe-area-inset-top), 12px)", background: "linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%)", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🧠</div>
-            <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.5px" }}>Mind<span style={{ color: "#818cf8" }}>Space</span></span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {/* Level badge */}
-            <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#1e293b", borderRadius: 20, padding: "4px 10px" }}>
-              <span style={{ fontSize: 11 }}>⚡</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#818cf8" }}>Lv.{levelInfo.level}</span>
-              <span style={{ fontSize: 11, color: "#475569" }}>{xp} XP</span>
-            </div>
-            <button onClick={() => setShowCrisis(true)} style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, padding: "4px 9px", color: "#fca5a5", fontSize: 11, cursor: "pointer", fontWeight: 500 }}>🆘 Help</button>
-          </div>
-        </div>
-
-        {/* XP Bar */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-            <span style={{ fontSize: 10, color: "#475569" }}>{levelInfo.title}</span>
-            {nextLevel && <span style={{ fontSize: 10, color: "#475569" }}>{nextLevel.minXp - xp} XP to {nextLevel.title}</span>}
-          </div>
-          <div style={{ height: 4, background: "#1e293b", borderRadius: 2, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${Math.min(xpProgress, 100)}%`, background: "linear-gradient(90deg, #6366f1, #8b5cf6)", borderRadius: 2, transition: "width 0.5s" }} />
-          </div>
-        </div>
-      </div>
-
-      {/* Scrollable Content */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 16px", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
-
-        {/* TODAY TAB */}
-        {tab === "home" && (
-          <div>
-            {entries.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
-                {[
-                  { label: "Streak", value: `${streakDays} 🔥` },
-                  { label: "7-day avg", value: avgMood || "—" },
-                  { label: "Entries", value: entries.length },
-                ].map(s => (
-                  <div key={s.label} style={{ background: "#1e293b", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-                    <div style={{ fontSize: 17, fontWeight: 700, color: "#e2e8f0" }}>{s.value}</div>
-                    <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {entries.length >= 3 && (
-              <div style={{ background: "#1e293b", borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
-                <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.5px" }}>Last 7 days</div>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 5, height: 44 }}>
-                  {last7.map((d, i) => {
-                    const h = d.entry ? (d.entry.mood / 5) * 100 : 0;
-                    const m = d.entry ? MOODS.find(x => x.id === d.entry.mood) : null;
-                    return (
-                      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                        <div style={{ width: "100%", borderRadius: 3, height: `${Math.max(h, 6)}%`, minHeight: d.entry ? 6 : 2, background: m ? m.color : "#1e3a4a", opacity: d.entry ? 1 : 0.3, alignSelf: "flex-end" }} />
-                        <div style={{ fontSize: 8, color: "#475569" }}>{["Su","Mo","Tu","We","Th","Fr","Sa"][d.date.getDay()]}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div style={{ background: "#1e293b", borderRadius: 14, padding: 14, marginBottom: 14 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#94a3b8" }}>How are you feeling <span style={{ color: "#e2e8f0" }}>today?</span></p>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 5 }}>
-                {MOODS.map(m => (
-                  <button key={m.id} onClick={() => setSelectedMood(m.id)} style={{
-                    flex: 1, background: selectedMood === m.id ? m.bg : "#0f172a",
-                    border: `2px solid ${selectedMood === m.id ? m.color : "#1e293b"}`,
-                    borderRadius: 10, padding: "9px 2px", cursor: "pointer", transition: "all 0.15s",
-                    display: "flex", flexDirection: "column", alignItems: "center", gap: 3
-                  }}>
-                    <span style={{ fontSize: 20 }}>{m.emoji}</span>
-                    <span style={{ fontSize: 8, color: selectedMood === m.id ? m.color : "#475569", fontWeight: 500 }}>{m.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {selectedMood && (
-              <>
-                <div style={{ background: "#1e293b", borderRadius: 14, padding: 14, marginBottom: 14 }}>
-                  <p style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>What's affecting your mood? (optional)</p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                    {TAGS.map(tag => (
-                      <button key={tag} onClick={() => setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])} style={{
-                        padding: "4px 9px", borderRadius: 20, fontSize: 11, cursor: "pointer", transition: "all 0.15s",
-                        background: selectedTags.includes(tag) ? "#4f46e5" : "#0f172a",
-                        border: `1px solid ${selectedTags.includes(tag) ? "#818cf8" : "#334155"}`,
-                        color: selectedTags.includes(tag) ? "#e0e7ff" : "#64748b",
-                      }}>{tag}</button>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ background: "#1e293b", borderRadius: 14, padding: 14, marginBottom: 14 }}>
-                  <p style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>Write something (optional)</p>
-                  <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="What's on your mind? How did the day go..." style={{ width: "100%", minHeight: 70, background: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: 9, color: "#e2e8f0", fontSize: 12, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5, fontFamily: "inherit" }} />
-                </div>
-                <button onClick={saveEntry} style={{ width: "100%", padding: "13px", background: saved ? "#16a34a" : "linear-gradient(135deg, #6366f1, #8b5cf6)", border: "none", borderRadius: 12, cursor: "pointer", color: "white", fontWeight: 600, fontSize: 14, transition: "all 0.2s" }}>
-                  {saved ? "✓ Saved! +5 XP" : "Save entry"}
-                </button>
-              </>
-            )}
-
-            {!entries.length && !selectedMood && (
-              <div style={{ textAlign: "center", padding: "28px 0", color: "#475569" }}>
-                <div style={{ fontSize: 38, marginBottom: 10 }}>💙</div>
-                <p style={{ fontSize: 13, lineHeight: 1.6 }}>Welcome to MindSpace.<br />Start each day with one mood entry.</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* QUESTS TAB */}
-        {tab === "quests" && (
-          <div>
-            {/* Level card */}
-            <div style={{ background: "linear-gradient(135deg, #1e1b4b, #1e293b)", border: "1px solid #4f46e5", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                <div>
-                  <div style={{ fontSize: 11, color: "#818cf8", fontWeight: 500, marginBottom: 2 }}>YOUR LEVEL</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: "#e2e8f0" }}>Lv.{levelInfo.level} — {levelInfo.title}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#818cf8" }}>{xp} XP</div>
-                  <div style={{ fontSize: 10, color: "#475569" }}>total earned</div>
-                </div>
-              </div>
-              <div style={{ height: 6, background: "#0f172a", borderRadius: 3, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${Math.min(xpProgress, 100)}%`, background: "linear-gradient(90deg, #6366f1, #8b5cf6)", borderRadius: 3, transition: "width 0.5s" }} />
-              </div>
-              {nextLevel && <div style={{ fontSize: 10, color: "#475569", marginTop: 4, textAlign: "right" }}>{nextLevel.minXp - xp} XP until {nextLevel.title}</div>}
-            </div>
-
-            {/* HBSC info */}
-            <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 12, padding: "10px 13px", marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: "#818cf8", fontWeight: 600, marginBottom: 3 }}>📊 About these quests</div>
-              <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.6 }}>Each quest is inspired by HBSC (Health Behaviour in School-aged Children) research data. Complete them to earn XP and build healthy habits that research shows actually work.</div>
-            </div>
-
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 10, fontWeight: 500 }}>Today's quests — {todayCompleted}/{todayQuestObjects.length} done</div>
-
-            {todayQuestObjects.map(quest => {
-              const done = isQuestDoneToday(quest.id);
-              const catColor = CATEGORY_COLORS[quest.category] || "#6366f1";
-              return (
-                <div key={quest.id} style={{ background: done ? "#0f2a1a" : "#1e293b", border: `1px solid ${done ? "#16a34a40" : "#334155"}`, borderRadius: 12, padding: "12px 14px", marginBottom: 10, transition: "all 0.2s" }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, background: done ? "#16a34a20" : `${catColor}20`, border: `1px solid ${done ? "#16a34a40" : `${catColor}40`}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{done ? "✅" : quest.icon}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: done ? "#86efac" : "#e2e8f0" }}>{quest.title}</div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: catColor }}>+{quest.xp} XP</div>
-                      </div>
-                      <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.5, marginBottom: done ? 0 : 8 }}>{quest.desc}</div>
-                      {!done && (
-                        <button onClick={() => completeQuest(quest.id)} style={{ background: `${catColor}20`, border: `1px solid ${catColor}40`, borderRadius: 8, padding: "5px 12px", color: catColor, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                          Mark as done ✓
-                        </button>
-                      )}
-                      {done && <div style={{ fontSize: 11, color: "#16a34a", fontWeight: 500 }}>Completed today! 🎉</div>}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* All quests section */}
-            <div style={{ fontSize: 12, color: "#64748b", margin: "20px 0 10px", fontWeight: 500 }}>All quests ({ALL_QUESTS.length})</div>
-            {ALL_QUESTS.map(quest => {
-              const done = isQuestDoneToday(quest.id);
-              const catColor = CATEGORY_COLORS[quest.category] || "#6366f1";
-              return (
-                <div key={quest.id} style={{ background: "#1e293b", borderRadius: 10, padding: "10px 12px", marginBottom: 8, display: "flex", alignItems: "center", gap: 10, opacity: done ? 0.6 : 1 }}>
-                  <span style={{ fontSize: 18 }}>{done ? "✅" : quest.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0" }}>{quest.title}</div>
-                    <div style={{ fontSize: 10, color: "#475569" }}>{quest.category}</div>
-                  </div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: catColor }}>+{quest.xp} XP</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* HISTORY TAB */}
-        {tab === "history" && (
-          <div>
-            {entries.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "#475569" }}>
-                <div style={{ fontSize: 38, marginBottom: 10 }}>📔</div>
-                <p>No entries yet.<br />Start with today!</p>
-              </div>
-            ) : (
-              <>
-                <div style={{ background: "#1e293b", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
-                  <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 500 }}>Mood distribution</div>
-                  {moodCounts.filter(m => m.count > 0).map(m => (
-                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                      <span style={{ width: 20, textAlign: "center", fontSize: 14 }}>{m.emoji}</span>
-                      <div style={{ flex: 1, height: 5, background: "#0f172a", borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ height: "100%", borderRadius: 3, background: m.color, width: `${(m.count / entries.length) * 100}%`, transition: "width 0.5s" }} />
-                      </div>
-                      <span style={{ fontSize: 11, color: "#64748b", minWidth: 16, textAlign: "right" }}>{m.count}</span>
-                    </div>
-                  ))}
-                </div>
-                {entries.map(entry => {
-                  const m = MOODS.find(x => x.id === entry.mood);
-                  return (
-                    <div key={entry.id} style={{ background: "#1e293b", borderRadius: 10, padding: "11px 12px", marginBottom: 8, borderLeft: `3px solid ${m?.color}` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 3 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                          <span style={{ fontSize: 18 }}>{m?.emoji}</span>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: m?.color }}>{m?.label}</span>
-                        </div>
-                        <span style={{ fontSize: 10, color: "#475569" }}>{formatDate(entry.date)}</span>
-                      </div>
-                      {entry.tags.length > 0 && (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginBottom: entry.note ? 5 : 0 }}>
-                          {entry.tags.map(tag => (
-                            <span key={tag} style={{ fontSize: 10, padding: "2px 7px", background: "#0f172a", borderRadius: 20, color: "#64748b", border: "1px solid #334155" }}>{tag}</span>
-                          ))}
-                        </div>
-                      )}
-                      {entry.note && <p style={{ fontSize: 12, color: "#94a3b8", margin: 0, lineHeight: 1.5 }}>{entry.note}</p>}
-                    </div>
-                  );
-                })}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* TIPS TAB */}
-        {tab === "tips" && (
-          <div>
-            <div style={{ background: "#1a1a2e", border: "1px solid #4f46e5", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
-              <div style={{ fontWeight: 600, fontSize: 12, color: "#818cf8", marginBottom: 5 }}>📊 HBSC Research Highlights</div>
-              <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.7 }}>
-                • 28% of teens feel stressed <em>every single day</em><br/>
-                • Only 20% meet recommended daily physical activity<br/>
-                • 40% sleep less than 8 hours on school nights<br/>
-                • Teens with strong social connections report 2x better wellbeing<br/>
-                <span style={{ color: "#475569", fontSize: 10 }}>Source: HBSC International Study, WHO</span>
-              </div>
-            </div>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10, fontWeight: 500 }}>EVIDENCE-BASED TIPS</div>
-            {TIPS.map((tip, i) => (
-              <div key={i} style={{ background: "#1e293b", borderRadius: 11, padding: "12px 14px", marginBottom: 9, display: "flex", alignItems: "flex-start", gap: 11 }}>
-                <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{tip.icon}</span>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 3, color: "#e2e8f0" }}>{tip.title}</div>
-                  <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>{tip.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* GAD-7 TAB */}
-        {tab === "gad7" && (
-          <div>
-            <div style={{ background: "#1a1a2e", border: "1px solid #4f46e5", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
-              <div style={{ fontWeight: 600, fontSize: 12, color: "#818cf8", marginBottom: 5 }}>📋 GAD-7 Anxiety Scale</div>
-              <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.7 }}>
-                The GAD-7 is a validated clinical tool used by psychologists worldwide to measure generalised anxiety. Answer 7 questions weekly to track your anxiety levels over time.
-              </div>
-            </div>
-
-            {gad7History.length > 0 && (() => {
-              const latest = gad7History[0];
-              const sev = getGad7Severity(latest.score);
-              return (
-                <div style={{ background: "#1e293b", borderRadius: 14, padding: "14px 16px", marginBottom: 14, borderLeft: `4px solid ${sev.color}` }}>
-                  <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Latest assessment — {formatDate(latest.date)}</div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div>
-                      <span style={{ fontSize: 28, fontWeight: 700, color: sev.color }}>{latest.score}</span>
-                      <span style={{ fontSize: 13, color: "#64748b" }}>/21</span>
-                    </div>
-                    <span style={{ background: `${sev.color}20`, border: `1px solid ${sev.color}40`, borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 600, color: sev.color }}>{sev.label} anxiety</span>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {gad7History.length === 0 && (
-              <div style={{ textAlign: "center", padding: "24px 0 16px", color: "#475569" }}>
-                <div style={{ fontSize: 34, marginBottom: 8 }}>📋</div>
-                <p style={{ fontSize: 13, lineHeight: 1.6 }}>No assessments yet.<br />Take your first GAD-7 check-in below.</p>
-              </div>
-            )}
-
-            <button onClick={() => { setGad7Step(0); setGad7Answers(Array(7).fill(null)); setShowGad7Quiz(true); }} style={{ width: "100%", padding: 13, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", border: "none", borderRadius: 12, cursor: "pointer", color: "white", fontWeight: 600, fontSize: 14, marginBottom: 20 }}>
-              Start This Week's Check-in
-            </button>
-
-            {gad7History.length > 0 && (
-              <>
-                <div style={{ fontSize: 11, color: "#64748b", fontWeight: 500, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>History ({gad7History.length})</div>
-                {gad7History.map(entry => {
-                  const sev = getGad7Severity(entry.score);
-                  return (
-                    <div key={entry.id} style={{ background: "#1e293b", borderRadius: 10, padding: "10px 13px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", marginBottom: 2 }}>{formatDate(entry.date)}</div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>Score: {entry.score}/21</div>
-                      </div>
-                      <span style={{ background: `${sev.color}20`, border: `1px solid ${sev.color}40`, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600, color: sev.color }}>{sev.label}</span>
-                    </div>
-                  );
-                })}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* WORRY JOURNAL TAB */}
-        {tab === "worry" && (
-          <div>
-            <div style={{ background: "#1a1a2e", border: "1px solid #4f46e5", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
-              <div style={{ fontWeight: 600, fontSize: 12, color: "#818cf8", marginBottom: 5 }}>🧩 CBT Worry Journal</div>
-              <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.7 }}>
-                Cognitive Behavioural Therapy (CBT) shows that writing out worries and challenging them reduces anxiety. Log a worry and walk through it step by step.
-              </div>
-            </div>
-
-            <button onClick={() => setWorryFormOpen(o => !o)} style={{ width: "100%", padding: 12, background: worryFormOpen ? "#1e293b" : "linear-gradient(135deg, #6366f1, #8b5cf6)", border: worryFormOpen ? "1px solid #334155" : "none", borderRadius: 12, cursor: "pointer", color: worryFormOpen ? "#64748b" : "white", fontWeight: 600, fontSize: 13, marginBottom: 12, transition: "all 0.2s" }}>
-              {worryFormOpen ? "✕ Cancel" : worrySaved ? "✓ Saved!" : "+ Log a Worry"}
-            </button>
-
-            {worryFormOpen && (
-              <div style={{ background: "#1e293b", borderRadius: 14, padding: 14, marginBottom: 14 }}>
-                <div style={{ marginBottom: 12 }}>
-                  <p style={{ fontSize: 12, color: "#94a3b8", marginBottom: 6, fontWeight: 600 }}>What's the worry?</p>
-                  <textarea value={worryForm.worry} onChange={e => setWorryForm(f => ({ ...f, worry: e.target.value }))} placeholder="Describe what's worrying you..." style={{ width: "100%", minHeight: 70, background: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: 9, color: "#e2e8f0", fontSize: 12, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5, fontFamily: "inherit" }} />
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <p style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>How likely is it to happen?</p>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: worryForm.likelihood <= 3 ? "#22c55e" : worryForm.likelihood <= 6 ? "#eab308" : "#ef4444" }}>{worryForm.likelihood}/10</span>
-                  </div>
-                  <input type="range" min="1" max="10" value={worryForm.likelihood} onChange={e => setWorryForm(f => ({ ...f, likelihood: parseInt(e.target.value) }))} style={{ width: "100%", accentColor: "#6366f1" }} />
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#475569", marginTop: 2 }}>
-                    <span>Very unlikely</span><span>Very likely</span>
-                  </div>
-                </div>
-
-                {[
-                  { key: "worst", label: "Worst case outcome", color: "#ef4444", placeholder: "What's the absolute worst that could happen?" },
-                  { key: "best", label: "Best case outcome", color: "#22c55e", placeholder: "What's the best that could happen?" },
-                  { key: "realistic", label: "Most realistic outcome", color: "#6366f1", placeholder: "What will most likely actually happen?" },
-                ].map(({ key, label, color, placeholder }) => (
-                  <div key={key} style={{ marginBottom: 10 }}>
-                    <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 5 }}><span style={{ color }}>●</span> <span style={{ color: "#94a3b8" }}>{label}</span></p>
-                    <textarea value={worryForm[key]} onChange={e => setWorryForm(f => ({ ...f, [key]: e.target.value }))} placeholder={placeholder} style={{ width: "100%", minHeight: 55, background: "#0f172a", border: `1px solid ${color}30`, borderRadius: 8, padding: 9, color: "#e2e8f0", fontSize: 12, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5, fontFamily: "inherit" }} />
-                  </div>
-                ))}
-
-                <button onClick={saveWorry} style={{ width: "100%", padding: 12, background: worryForm.worry.trim() ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "#0f172a", border: "none", borderRadius: 11, cursor: worryForm.worry.trim() ? "pointer" : "default", color: worryForm.worry.trim() ? "white" : "#334155", fontWeight: 600, fontSize: 13, transition: "all 0.2s" }}>
-                  Save Entry
-                </button>
-              </div>
-            )}
-
-            {worryEntries.length === 0 && !worryFormOpen && (
-              <div style={{ textAlign: "center", padding: "28px 0", color: "#475569" }}>
-                <div style={{ fontSize: 34, marginBottom: 8 }}>🧩</div>
-                <p style={{ fontSize: 13, lineHeight: 1.6 }}>No worry entries yet.<br />Log your first one above.</p>
-              </div>
-            )}
-
-            {worryEntries.length > 0 && (
-              <>
-                <div style={{ fontSize: 11, color: "#64748b", fontWeight: 500, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>Past Entries ({worryEntries.length})</div>
-                {worryEntries.map(entry => {
-                  const likColor = entry.likelihood <= 3 ? "#22c55e" : entry.likelihood <= 6 ? "#eab308" : "#ef4444";
-                  return (
-                    <div key={entry.id} style={{ background: "#1e293b", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <span style={{ fontSize: 10, color: "#475569" }}>{formatDate(entry.date)}</span>
-                        <span style={{ background: `${likColor}20`, border: `1px solid ${likColor}40`, borderRadius: 20, padding: "2px 9px", fontSize: 11, fontWeight: 600, color: likColor }}>Likelihood: {entry.likelihood}/10</span>
-                      </div>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", marginBottom: 8, lineHeight: 1.5 }}>{entry.worry}</p>
-                      {[
-                        { key: "worst", label: "Worst case", color: "#ef4444" },
-                        { key: "best", label: "Best case", color: "#22c55e" },
-                        { key: "realistic", label: "Most realistic", color: "#6366f1" },
-                      ].filter(({ key }) => entry[key]).map(({ key, label, color }) => (
-                        <div key={key} style={{ marginBottom: 5 }}>
-                          <span style={{ fontSize: 10, fontWeight: 600, color, marginRight: 5 }}>{label}:</span>
-                          <span style={{ fontSize: 11, color: "#64748b" }}>{entry[key]}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </>
-            )}
-          </div>
-        )}
-
-      </div>
-
-      {/* Bottom Navigation */}
-      <div style={{
-        display: "flex", flexShrink: 0,
-        borderTop: "1px solid #1e293b",
-        background: "linear-gradient(0deg, #1a1a2e 0%, #0f0f1a 100%)",
-        paddingBottom: "max(env(safe-area-inset-bottom), 6px)"
-      }}>
-        {[
-          { id: "home", label: "Today", icon: "🏠" },
-          { id: "quests", label: "Quests", icon: "⚔️", badge: `${todayCompleted}/${todayQuestObjects.length}` },
-          { id: "history", label: "History", icon: "📔" },
-          { id: "tips", label: "Tips", icon: "💡" },
-          { id: "gad7", label: "Check-in", icon: "📋" },
-          { id: "worry", label: "Worries", icon: "🧩" },
-        ].map(t => {
-          const active = tab === t.id;
-          return (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              flex: 1, background: "none", border: "none", cursor: "pointer",
-              padding: "7px 1px 5px", display: "flex", flexDirection: "column",
-              alignItems: "center", gap: 3, position: "relative",
-              color: active ? "#818cf8" : "#475569", transition: "color 0.15s",
-              borderTop: active ? "2px solid #818cf8" : "2px solid transparent",
-              marginTop: -1
-            }}>
-              <span style={{ fontSize: 19, lineHeight: 1, position: "relative" }}>
-                {t.icon}
-                {t.badge && (
-                  <span style={{
-                    position: "absolute", top: -5, left: "100%", marginLeft: -8,
-                    background: "#4f46e5", borderRadius: 9, padding: "0px 4px",
-                    fontSize: 8, fontWeight: 700, color: "#e0e7ff", lineHeight: "13px"
-                  }}>{t.badge}</span>
-                )}
-              </span>
-              <span style={{ fontSize: 9, fontWeight: 500, whiteSpace: "nowrap" }}>{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Floating Chat Bubble (FAB) */}
-      {!chatOpen && (
-        <button onClick={() => setChatOpen(true)} aria-label="Chat with Milo" style={{
-          position: "absolute", right: 16,
-          bottom: "calc(env(safe-area-inset-bottom, 0px) + 72px)",
-          width: 56, height: 56, borderRadius: "50%", border: "none", cursor: "pointer",
-          background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-          boxShadow: "0 6px 22px rgba(99,102,241,0.55)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 24, zIndex: 80, transition: "transform 0.15s"
-        }}>💬</button>
-      )}
-
-      {/* Floating Chat Panel */}
-      {chatOpen && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 90 }}>
-          <div onClick={() => setChatOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} />
-          <div style={{
-            position: "absolute", left: 10, right: 10,
-            top: 58, bottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
-            display: "flex", flexDirection: "column",
-            background: "#0f0f1a", border: "1px solid #1e293b", borderRadius: 18,
-            boxShadow: "0 12px 44px rgba(0,0,0,0.6)", overflow: "hidden"
-          }}>
-            {/* Panel header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 13px", borderBottom: "1px solid #1e293b", background: "linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%)", flexShrink: 0 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🧠</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0" }}>Milo</div>
-                <div style={{ fontSize: 10, color: "#22c55e", display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />Your companion</div>
-              </div>
-              <button onClick={startNewChat} disabled={isLoading || chatMessages.length <= 1} aria-label="Start a new chat" title="New chat" style={{ display: "flex", alignItems: "center", gap: 4, background: "#1e293b", border: "1px solid #334155", borderRadius: 9, padding: "0 10px", height: 30, color: chatMessages.length <= 1 ? "#475569" : "#a5b4fc", fontSize: 12, fontWeight: 600, cursor: chatMessages.length <= 1 ? "default" : "pointer" }}>＋ New</button>
-              <button onClick={() => setChatOpen(false)} aria-label="Close chat" style={{ background: "#1e293b", border: "none", borderRadius: 9, width: 30, height: 30, color: "#94a3b8", fontSize: 15, cursor: "pointer" }}>✕</button>
-            </div>
-
-            {/* Messages */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "12px 13px" }}>
-              {chatMessages.map((msg, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: 8 }}>
-                  {msg.role === "assistant" && (
-                    <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, marginRight: 7, marginTop: 2 }}>🧠</div>
-                  )}
-                  <div style={{ maxWidth: "78%", background: msg.role === "user" ? "linear-gradient(135deg, #4f46e5, #7c3aed)" : "#1e293b", borderRadius: msg.role === "user" ? "13px 13px 3px 13px" : "13px 13px 13px 3px", padding: "9px 12px", fontSize: 13, lineHeight: 1.6, color: "#e2e8f0" }}>
-                    {msg.content.split("\n").map((line, j) => <span key={j}>{line}{j < msg.content.split("\n").length - 1 && <br />}</span>)}
-                  </div>
-                </div>
-              ))}
-              {isLoading && (
-                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-                  <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>🧠</div>
-                  <div style={{ background: "#1e293b", borderRadius: "13px 13px 13px 3px", padding: "9px 13px", display: "flex", gap: 4, alignItems: "center" }}>
-                    {[0, 150, 300].map(delay => (
-                      <div key={delay} style={{ width: 5, height: 5, borderRadius: "50%", background: "#6366f1", animation: "bounce 1s infinite", animationDelay: `${delay}ms` }} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Input */}
-            <div style={{ display: "flex", gap: 7, padding: "10px 12px", borderTop: "1px solid #1e293b", flexShrink: 0 }}>
-              <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendChat()} placeholder="How are you feeling..." style={{ flex: 1, background: "#1e293b", border: "1px solid #334155", borderRadius: 11, padding: "10px 13px", color: "#e2e8f0", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
-              <button onClick={sendChat} disabled={isLoading || !chatInput.trim()} style={{ background: chatInput.trim() ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "#1e293b", border: "none", borderRadius: 11, padding: "0 15px", cursor: chatInput.trim() ? "pointer" : "default", color: "white", fontSize: 17 }}>→</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* GAD-7 Quiz Modal */}
-      {showGad7Quiz && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", zIndex: 100 }}>
-          <div style={{ background: "#1e293b", borderRadius: "18px 18px 0 0", padding: "20px 16px", paddingBottom: "max(env(safe-area-inset-bottom), 20px)", width: "100%", maxWidth: "100%" }}>
-            <div style={{ width: 32, height: 4, background: "#334155", borderRadius: 2, margin: "0 auto 16px" }} />
-
-            {gad7Step < 7 ? (
-              <>
-                {/* Progress bar */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                    <span style={{ fontSize: 11, color: "#64748b" }}>Question {gad7Step + 1} of 7</span>
-                    <span style={{ fontSize: 11, color: "#818cf8" }}>GAD-7</span>
-                  </div>
-                  <div style={{ height: 4, background: "#0f172a", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${((gad7Step + 1) / 7) * 100}%`, background: "linear-gradient(90deg, #6366f1, #8b5cf6)", borderRadius: 2, transition: "width 0.3s" }} />
-                  </div>
-                </div>
-
-                <p style={{ fontSize: 13, color: "#94a3b8", marginBottom: 4, lineHeight: 1.5 }}>Over the <strong style={{ color: "#e2e8f0" }}>last 2 weeks</strong>, how often have you been bothered by:</p>
-                <p style={{ fontSize: 15, fontWeight: 600, color: "#e2e8f0", marginBottom: 16, lineHeight: 1.5 }}>{GAD7_QUESTIONS[gad7Step]}</p>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
-                  {GAD7_OPTIONS.map((opt, i) => (
-                    <button key={i} onClick={() => setGad7Answers(prev => { const a = [...prev]; a[gad7Step] = i; return a; })} style={{
-                      background: gad7Answers[gad7Step] === i ? "#4f46e520" : "#0f172a",
-                      border: `2px solid ${gad7Answers[gad7Step] === i ? "#6366f1" : "#334155"}`,
-                      borderRadius: 10, padding: "10px 14px", cursor: "pointer", textAlign: "left",
-                      color: gad7Answers[gad7Step] === i ? "#818cf8" : "#64748b",
-                      fontSize: 13, fontWeight: gad7Answers[gad7Step] === i ? 600 : 400,
-                      transition: "all 0.15s", display: "flex", alignItems: "center", gap: 10
-                    }}>
-                      <span style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${gad7Answers[gad7Step] === i ? "#6366f1" : "#334155"}`, background: gad7Answers[gad7Step] === i ? "#6366f1" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        {gad7Answers[gad7Step] === i && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "white" }} />}
-                      </span>
-                      <span>{opt}</span>
-                      <span style={{ marginLeft: "auto", fontSize: 11, color: "#475569" }}>+{i}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{ display: "flex", gap: 8 }}>
-                  {gad7Step > 0 && (
-                    <button onClick={() => setGad7Step(s => s - 1)} style={{ flex: 1, padding: 11, background: "#0f172a", border: "1px solid #334155", borderRadius: 11, color: "#64748b", fontSize: 13, cursor: "pointer" }}>← Back</button>
-                  )}
-                  <button onClick={() => {
-                    if (gad7Answers[gad7Step] === null) return;
-                    if (gad7Step === 6) submitGad7();
-                    else setGad7Step(s => s + 1);
-                  }} disabled={gad7Answers[gad7Step] === null} style={{
-                    flex: 2, padding: 11,
-                    background: gad7Answers[gad7Step] !== null ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "#1e293b",
-                    border: "none", borderRadius: 11, color: gad7Answers[gad7Step] !== null ? "white" : "#475569",
-                    fontSize: 13, fontWeight: 600, cursor: gad7Answers[gad7Step] !== null ? "pointer" : "default", transition: "all 0.2s"
-                  }}>
-                    {gad7Step === 6 ? "See Results" : "Next →"}
-                  </button>
-                </div>
-              </>
-            ) : (
-              /* Result screen */
-              (() => {
-                const score = gad7Answers.reduce((s, a) => s + (a ?? 0), 0);
-                const sev = getGad7Severity(score);
-                const interpretations = {
-                  Minimal: "Your anxiety levels are minimal. Keep up the healthy habits!",
-                  Mild: "Mild anxiety detected. Breathing exercises and regular check-ins can help.",
-                  Moderate: "Moderate anxiety. Consider talking to a trusted person or counsellor.",
-                  Severe: "Significant anxiety. Speaking with a mental health professional is recommended.",
-                };
-                return (
-                  <>
-                    <div style={{ textAlign: "center", marginBottom: 20 }}>
-                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>Your GAD-7 Score</div>
-                      <div style={{ fontSize: 52, fontWeight: 700, color: sev.color, lineHeight: 1 }}>{score}</div>
-                      <div style={{ fontSize: 13, color: "#64748b", marginBottom: 10 }}>out of 21</div>
-                      <span style={{ background: `${sev.color}20`, border: `1px solid ${sev.color}40`, borderRadius: 20, padding: "5px 16px", fontSize: 14, fontWeight: 700, color: sev.color }}>{sev.label} Anxiety</span>
-                    </div>
-                    <div style={{ background: "#0f172a", borderRadius: 11, padding: "12px 14px", marginBottom: 18 }}>
-                      <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>{interpretations[sev.label]}</div>
-                    </div>
-                    <div style={{ background: "#0f172a", borderRadius: 11, padding: "10px 14px", marginBottom: 18 }}>
-                      <div style={{ fontSize: 11, color: "#475569", marginBottom: 6, fontWeight: 500 }}>Score guide</div>
-                      {[["0–4", "Minimal", "#22c55e"], ["5–9", "Mild", "#eab308"], ["10–14", "Moderate", "#f97316"], ["15–21", "Severe", "#ef4444"]].map(([range, label, color]) => (
-                        <div key={label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                          <span style={{ fontSize: 11, color: "#64748b" }}>{range}</span>
-                          <span style={{ fontSize: 11, fontWeight: 600, color }}>{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <button onClick={resetGad7Quiz} style={{ width: "100%", padding: 12, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", border: "none", borderRadius: 11, color: "white", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Done ✓</button>
-                  </>
-                );
-              })()
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Crisis Modal */}
-      {showCrisis && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", zIndex: 100 }} onClick={() => setShowCrisis(false)}>
-          <div style={{ background: "#1e293b", borderRadius: "18px 18px 0 0", padding: "20px 16px", paddingBottom: "max(env(safe-area-inset-bottom), 20px)", width: "100%", maxWidth: "100%" }} onClick={e => e.stopPropagation()}>
-            <div style={{ width: 32, height: 4, background: "#334155", borderRadius: 2, margin: "0 auto 16px" }} />
-            <h3 style={{ fontSize: 15, fontWeight: 600, color: "#e2e8f0", marginBottom: 5 }}>Asking for help is brave</h3>
-            <p style={{ fontSize: 12, color: "#64748b", marginBottom: 14, lineHeight: 1.6 }}>If you're going through a tough time, these lines are here for you — free, confidential and available.</p>
-            {CRISIS_RESOURCES.map((r, i) => (
-              <div key={i} style={{ background: "#0f172a", borderRadius: 11, padding: "11px 13px", marginBottom: 7, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: "#e2e8f0", marginBottom: 2 }}>{r.flag} {r.name}</div>
-                  <div style={{ fontSize: 10, color: "#475569" }}>{r.available}</div>
-                </div>
-                <a href={`tel:${r.number.replace(/\s/g, "")}`} style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, padding: "5px 11px", color: "#fca5a5", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>{r.number}</a>
-              </div>
-            ))}
-            <button onClick={() => setShowCrisis(false)} style={{ width: "100%", marginTop: 6, padding: 11, background: "#334155", border: "none", borderRadius: 11, color: "#94a3b8", fontSize: 13, cursor: "pointer" }}>Close</button>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-4px); } }
-        @keyframes fadeUp { 0% { opacity: 1; transform: translateX(-50%) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        textarea::placeholder, input::placeholder { color: #334155; }
-        /* Keep text fields >=16px so mobile Safari doesn't zoom on focus */
-        textarea, input:not([type="range"]) { font-size: 16px !important; }
-        ::-webkit-scrollbar { width: 3px; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
-        html, body { height: 100%; overflow: hidden; background: #0f0f1a; }
-      `}</style>
-    </div>
-  );
+  return <div style={styles.page}>{toast && <Toast>{toast}</Toast>}<div style={styles.appTop}><div><p style={styles.muted}>{new Date().toLocaleDateString("mk-MK", { weekday: "long", day: "numeric", month: "long" })}</p><h1 style={styles.title}>Здраво, {profile.nick} 👋</h1></div><button style={styles.avatar} onClick={() => setTab("profile")}>{profile.avatar}</button></div><main style={styles.scroll}>{tab === "home" && <Home selectedMood={selectedMood} setSelectedMood={setSelectedMood} saveMood={saveMood} streak={streak} xp={xp} />} {tab === "games" && <Games setGame={setGame} setScreen={setScreen} />} {tab === "calendar" && <Calendar entries={entries} last7={last7} />} {tab === "tips" && <Tips />} {tab === "profile" && <Profile profile={profile} setProfile={setProfile} xp={xp} streak={streak} entries={entries} logout={logout} />}</main><Tabs tab={tab} setTab={setTab} /><button style={styles.chatFab} onClick={() => setChatOpen(true)}>💬</button>{chatOpen && <Chat chatMessages={chatMessages} chatInput={chatInput} setChatInput={setChatInput} sendChat={sendChat} loading={aiLoading} close={() => setChatOpen(false)} chatEnd={chatEnd} />}</div>;
 }
+
+function Home({ selectedMood, setSelectedMood, saveMood, streak, xp }) {
+  const progress = Math.min((xp % 100), 100);
+  return <><Card style={{ background: COLORS.amber }}><h2>{formatStreak(streak)}</h2><p style={styles.text}>Стрикот се брои по датуми со барем еден внес. Можеш повеќе внесови во ист ден, но стрикот останува истиот ден.</p><div style={styles.progress}><div style={{ ...styles.progressFill, width: `${progress}%` }} /></div><p style={styles.muted}>{xp} XP · следен беџ на секои 100 XP</p></Card><Card><h2>Како се чувствуваш денес?</h2><div style={styles.moodGrid}>{MOODS.map(m => <button key={m.id} onClick={() => setSelectedMood(m.id)} style={{ ...styles.moodBtn, borderColor: selectedMood === m.id ? m.color : COLORS.line, background: selectedMood === m.id ? `${m.color}18` : COLORS.white }}><span>{m.emoji}</span><b>{m.mk}</b></button>)}</div><Button disabled={!selectedMood} onClick={() => saveMood(selectedMood)}>Зачувај чувство</Button></Card><Card style={{ background: COLORS.green }}><h2>Топла порака за денес</h2><p style={styles.text}>{todayWarmMessage()}</p></Card></>;
+}
+function Games({ setGame, setScreen }) { return <><h1 style={styles.title}>Игри и активности 🎮</h1><div style={styles.gameGrid}>{ACTIVITIES.map(a => <button key={a.id} style={{ ...styles.gameCard, background: a.bg }} onClick={() => { setGame(a.id); setScreen("game"); }}><span>{a.icon}</span><b>{a.title}</b><small>{a.time}</small></button>)}</div></>; }
+function Calendar({ entries, last7 }) {
+  const now = new Date();
+  const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const month = now.toLocaleDateString("mk-MK", { month: "long", year: "numeric" });
+  const entriesByDay = useMemo(() => {
+    const map = {};
+    for (const e of entries) {
+      const d = new Date(e.date);
+      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+        const day = d.getDate();
+        if (!map[day]) map[day] = [];
+        map[day].push(e);
+      }
+    }
+    return map;
+  }, [entries]);
+  return <><h1 style={styles.title}>Календар</h1><Card><h2 style={{ textTransform: "capitalize" }}>{month}</h2><div style={styles.calendarGrid}>{Array.from({ length: days }, (_, i) => { const day = i + 1; const list = entriesByDay[day] || []; const avg = list.length ? Math.round(list.reduce((s, e) => s + e.score, 0) / list.length) : 0; const mood = MOODS.find(m => Math.round(m.score) === avg); return <div key={day} style={{ ...styles.day, background: mood ? `${mood.color}35` : COLORS.cream, borderColor: mood ? mood.color : COLORS.line }}><b>{day}</b>{list.length > 0 && <small>{list.length}</small>}</div>; })}</div></Card><Card><h2>Последни 7 дена</h2><div style={styles.chart}>{last7.map((d, i) => <div key={i} style={styles.chartCol}><div style={{ ...styles.chartBar, height: `${Math.max(d.avg * 18, d.count ? 18 : 4)}%`, opacity: d.count ? 1 : 0.25 }} /><small>{d.date.toLocaleDateString("mk-MK", { weekday: "short" })}</small></div>)}</div></Card></>;
+}
+function Tips() { return <><h1 style={styles.title}>Совети</h1>{EXTRA_TIPS.concat(["Направи мала листа: што можам сега, што може да почека, што не е моја контрола.", "Кога нешто е непријатно, пробај да го именуваш чувството со еден збор.", "Пофали се за трудот, не само за резултатот."]).map((t, i) => <Card key={i}><h2>Совет {i + 1}</h2><p style={styles.text}>{t}</p></Card>)}</>; }
+function Profile({ profile, setProfile, xp, streak, entries, logout }) {
+  const badges = Math.floor(xp / 100);
+  return <><div style={styles.profileHead}><div style={styles.bigAvatar}>{profile.avatar}</div><h1>{profile.nick}</h1><p style={styles.muted}>{formatStreak(streak)} · {entries.length} внесови · {xp} XP</p></div><Card><h2>Напредок</h2><div style={styles.progress}><div style={{ ...styles.progressFill, width: `${xp % 100}%` }} /></div><p style={styles.text}>Секое чувство носи 10 XP, секоја завршена игра носи XP. На секои 100 XP добиваш беџ.</p></Card><Card><h2>Беџови</h2><div style={styles.badgeGrid}>{Array.from({ length: 8 }, (_, i) => <span key={i} style={{ ...styles.badge, opacity: i < badges ? 1 : .35 }}>{i < badges ? "🏅" : "🔒"} Беџ {i + 1}</span>)}</div></Card><Card><h2>Аватар</h2><div style={styles.chips}>{["🦊", "🐸", "🐱", "🐼", "🐰", "🦉"].map(a => <button key={a} style={styles.chip} onClick={() => setProfile({ ...profile, avatar: a })}>{a}</button>)}</div></Card><Button ghost onClick={logout}>Одјави се</Button></>;
+}
+function Tabs({ tab, setTab }) { return <nav style={styles.tabs}>{[["home", "🏠", "Дома"], ["games", "🧩", "Игри"], ["calendar", "📅", "Календар"], ["tips", "💡", "Совети"], ["profile", "👤", "Профил"]].map(t => <button key={t[0]} onClick={() => setTab(t[0])} style={{ ...styles.tab, color: tab === t[0] ? COLORS.coral : COLORS.muted }}><span>{t[1]}</span><small>{t[2]}</small></button>)}</nav>; }
+function Game({ game, setScreen, addXP, gratitudes, setGratitudes }) {
+  const [breath, setBreath] = useState(0);
+  const [grat, setGrat] = useState(["", "", ""]);
+  const [feedback, setFeedback] = useState("");
+  const [score, setScore] = useState(0);
+  const [cards, setCards] = useState(() => ["🌙", "🌙", "🌿", "🌿", "⭐", "⭐", "🎵", "🎵"].sort(() => Math.random() - .5));
+  const [open, setOpen] = useState([]);
+  useEffect(() => { if (game !== "breath") return; const id = setInterval(() => setBreath(v => v + 1), 1000); return () => clearInterval(id); }, [game]);
+  const finish = (label = "Игра завршена") => { addXP(15, "+15 XP · " + label); setScreen("app"); };
+  const phase = breath % 10 < 4 ? "Вдиши" : breath % 10 < 6 ? "Задржи" : "Издиши";
+  if (game === "breath") return <div style={styles.page}><Header title="Дишечка вежба" onBack={() => setScreen("app")} /><div style={styles.center}><div style={{ ...styles.breath, transform: `scale(${phase === "Вдиши" ? 1.22 : phase === "Издиши" ? .86 : 1.05})` }}>{phase}</div><p>{Math.floor(breath / 10) + 1} / 6 циклуси</p><Button onClick={() => finish("дишење")}>Завршив</Button></div></div>;
+  if (game === "balloon") return <div style={styles.page}><Header title="Следи го балонот" onBack={() => setScreen("app")} /><div style={styles.balloonBox}><div style={styles.movingBalloon}>🎈</div></div><p style={styles.text}>Следи го балонот со поглед. Кога вниманието ќе избега, нежно врати го назад.</p><Button onClick={() => finish("фокус")}>Завршив</Button></div>;
+  if (game === "gratitude") return <div style={styles.page}><Header title="Благодарна листа" onBack={() => setScreen("app")} />{grat.map((g, i) => <Input key={i} placeholder={`${i + 1}. Нешто добро денес...`} value={g} onChange={v => setGrat(grat.map((x, idx) => idx === i ? v : x))} />)}<Button onClick={() => { const clean = grat.filter(x => x.trim()); if (clean.length) setGratitudes([{ id: Date.now(), date: new Date().toISOString(), items: clean }, ...gratitudes]); finish("благодарност"); }}>Зачувај</Button><Card><h2>Претходно зачувано</h2>{gratitudes.length ? gratitudes.slice(0, 5).map(g => <p key={g.id} style={styles.text}>• {g.items.join(" · ")}</p>) : <p style={styles.text}>Сè уште нема зачувани листи.</p>}</Card></div>;
+  if (game === "scenario") return <div style={styles.page}><Header title="Сценарио избор" onBack={() => setScreen("app")} /><Card><h2>Другар те игнорира во групен чет. Што правиш?</h2>{["Прашувам смирено што се случило", "Чекам да се смирам прво", "Зборувам со возрасен ако ме повредува"].map((x, i) => <Button key={x} ghost onClick={() => setFeedback(["Ова е директен и зрел избор.", "Добро е прво да се смириш пред реакција.", "Добар избор кога ситуацијата те повредува подолго."][i])}>{x}</Button>)}{feedback && <p style={styles.text}>{feedback}</p>}</Card><Button onClick={() => finish("сценарио")}>Заврши</Button></div>;
+  if (game === "memory") return <div style={styles.page}><Header title="Меморија парови" onBack={() => setScreen("app")} /><div style={styles.memory}>{cards.map((c, i) => <button key={i} style={styles.memCard} onClick={() => setOpen(o => o.includes(i) ? o : [...o, i])}>{open.includes(i) ? c : "?"}</button>)}</div><Button onClick={() => finish("меморија")}>Завршив</Button></div>;
+  if (game === "tap") return <div style={styles.page}><Header title="Брз фокус" onBack={() => setScreen("app")} /><div style={styles.center}><button style={styles.tapBtn} onClick={() => setScore(score + 1)}>Тапни</button><h1>{score}</h1><p style={styles.text}>Тапни 20 пати за краток фокус reset.</p><Button onClick={() => finish("брз фокус")}>Завршив</Button></div></div>;
+  if (game === "sort") return <div style={styles.page}><Header title="Сортирај мисли" onBack={() => setScreen("app")} /><Card><h2>Стави ја мислата во кутија</h2>{["Важно сега", "Може да почека", "Не е моја контрола"].map(x => <Button key={x} ghost onClick={() => setFeedback(`Ја избра кутијата: ${x}. Ова помага да не изгледа сè итно.`)}>{x}</Button>)}{feedback && <p style={styles.text}>{feedback}</p>}</Card><Button onClick={() => finish("сортирање")}>Заврши</Button></div>;
+  if (game === "colors") return <div style={styles.page}><Header title="Најди ја бојата" onBack={() => setScreen("app")} /><Card><h2>Најди нешто околу тебе во оваа боја:</h2><div style={{ ...styles.colorPrompt, background: [COLORS.coral, COLORS.mint, COLORS.lavender, COLORS.amber][score % 4] }} /><Button onClick={() => setScore(score + 1)}>Најдов</Button></Card><Button onClick={() => finish("боја")}>Заврши</Button></div>;
+  if (game === "kind") return <div style={styles.page}><Header title="Топла порака" onBack={() => setScreen("app")} /><Card style={{ background: COLORS.green }}><h2>Порака</h2><p style={styles.text}>{todayWarmMessage()}</p></Card><Button onClick={() => finish("топла порака")}>Зачувај како прочитано</Button></div>;
+  if (game === "confidence") return <div style={styles.page}><Header title="Самодоверба чекор" onBack={() => setScreen("app")} /><Card><h2>Доврши ја реченицата:</h2><p style={styles.text}>Денес сум горда/горд на себе затоа што...</p><Input placeholder="Мал доказ за себе..." value={feedback} onChange={setFeedback} /></Card><Button onClick={() => finish("самодоверба")}>Зачувај</Button></div>;
+  return null;
+}
+function Chat({ chatMessages, chatInput, setChatInput, sendChat, loading, close, chatEnd }) { return <div style={styles.overlay}><div style={styles.chat}><div style={styles.chatHead}><b>Другар AI</b><button style={styles.link} onClick={close}>✕</button></div><div style={styles.chatBody}>{chatMessages.map((m, i) => <div key={i} style={{ ...styles.msg, alignSelf: m.role === "user" ? "flex-end" : "flex-start", background: m.role === "user" ? COLORS.coral : COLORS.cream, color: COLORS.text }}>{m.content}</div>)}{loading && <div style={styles.msg}>Другар пишува...</div>}<div ref={chatEnd} /></div><div style={styles.chatInput}><input style={styles.input} value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendChat()} placeholder="Пиши му на Другар..." /><button style={styles.send} onClick={sendChat}>Испрати</button></div></div></div>; }
+function Buddy({ size = 78, mood }) { const face = mood === "sad" ? "🥺" : mood === "stress" ? "😟" : "😊"; return <div style={{ width: size, height: size, borderRadius: "34% 46% 38% 42%", background: `linear-gradient(135deg, ${COLORS.coral}, #FF9A76)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * .45, margin: "0 auto 14px", boxShadow: "0 18px 40px #ff6f6130" }}>{face}</div>; }
+function Card({ children, style }) { return <div style={{ ...styles.card, ...style }}>{children}</div>; }
+function Button({ children, onClick, ghost, disabled }) { return <button disabled={disabled} onClick={onClick} style={{ ...styles.button, ...(ghost ? styles.ghostButton : {}), ...(disabled ? styles.disabled : {}) }}>{children}</button>; }
+function Input({ value, onChange, placeholder, type = "text" }) { return <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={styles.inputBox} />; }
+function Header({ title, onBack }) { return <div style={styles.header}><button style={styles.back} onClick={onBack}>←</button><h2>{title}</h2><span /></div>; }
+function Toast({ children }) { return <div style={styles.toast}>{children}</div>; }
+
+const styles = {
+  page: { minHeight: "100dvh", background: COLORS.cream, color: COLORS.text, fontFamily: "Inter, system-ui, Arial, sans-serif", padding: 18, boxSizing: "border-box", position: "relative" },
+  center: { minHeight: "75dvh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" },
+  logo: { fontSize: 38, margin: "8px 0", letterSpacing: -1 }, title: { fontSize: 27, lineHeight: 1.05, margin: "8px 0 12px", letterSpacing: -1 },
+  text: { color: COLORS.muted, lineHeight: 1.55, fontSize: 15 }, textSmall: { color: COLORS.muted, textAlign: "center" }, muted: { color: COLORS.muted, fontSize: 13, margin: 0 },
+  card: { background: COLORS.white, border: `1px solid ${COLORS.line}`, borderRadius: 26, padding: 18, marginBottom: 14, boxShadow: "0 16px 44px #40362410" },
+  button: { width: "100%", border: 0, background: COLORS.coral, color: "white", borderRadius: 18, padding: "14px 18px", fontWeight: 800, fontSize: 15, marginTop: 10, cursor: "pointer", boxShadow: "0 12px 26px #ff6f6133" },
+  ghostButton: { background: COLORS.white, color: COLORS.text, border: `1px solid ${COLORS.line}`, boxShadow: "none" }, disabled: { opacity: .45, cursor: "not-allowed" },
+  inputBox: { width: "100%", border: `1px solid ${COLORS.line}`, outline: 0, background: COLORS.white, borderRadius: 16, padding: 14, fontSize: 14, boxSizing: "border-box", color: COLORS.text, margin: "8px 0" },
+  input: { width: "100%", border: 0, outline: 0, background: "transparent", padding: 14, fontSize: 14, boxSizing: "border-box", color: COLORS.text }, link: { border: 0, background: "transparent", color: COLORS.coral, fontWeight: 900, cursor: "pointer" },
+  or: { textAlign: "center", color: COLORS.muted, margin: "14px 0 4px" }, appTop: { display: "flex", justifyContent: "space-between", alignItems: "center" }, avatar: { width: 50, height: 50, borderRadius: 20, border: 0, background: COLORS.white, fontSize: 25, boxShadow: "0 10px 25px #00000012" },
+  scroll: { height: "calc(100dvh - 145px)", overflowY: "auto", paddingBottom: 96 }, tabs: { position: "fixed", left: 12, right: 12, bottom: 12, height: 68, background: COLORS.white, borderRadius: 28, border: `1px solid ${COLORS.line}`, display: "grid", gridTemplateColumns: "repeat(5, 1fr)", boxShadow: "0 18px 50px #00000018", zIndex: 5 }, tab: { border: 0, background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontWeight: 800, cursor: "pointer" },
+  progress: { height: 10, background: "#FFF5D6", borderRadius: 99, overflow: "hidden", marginTop: 12 }, progressFill: { height: "100%", background: COLORS.coral, borderRadius: 99 }, moodGrid: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }, moodBtn: { border: `2px solid ${COLORS.line}`, borderRadius: 20, padding: 14, background: COLORS.white, display: "flex", flexDirection: "column", gap: 5, alignItems: "center", cursor: "pointer" },
+  gameGrid: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }, gameCard: { border: 0, borderRadius: 24, padding: 16, minHeight: 120, textAlign: "left", display: "flex", flexDirection: "column", gap: 8, cursor: "pointer", color: COLORS.text },
+  calendarGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 7 }, day: { minHeight: 44, borderRadius: 14, border: `1px solid ${COLORS.line}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 },
+  chart: { height: 145, display: "flex", alignItems: "end", gap: 10, paddingTop: 16 }, chartCol: { flex: 1, height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "end", gap: 5 }, chartBar: { width: "100%", background: COLORS.coral, borderRadius: "10px 10px 4px 4px", minHeight: 4 },
+  profileHead: { textAlign: "center", padding: 14 }, bigAvatar: { width: 92, height: 92, borderRadius: 34, background: COLORS.white, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48, boxShadow: "0 12px 35px #00000012" }, badgeGrid: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }, badge: { background: COLORS.cream, borderRadius: 14, padding: 10, fontWeight: 800 }, chips: { display: "flex", flexWrap: "wrap", gap: 8 }, chip: { border: `1px solid ${COLORS.line}`, background: COLORS.white, borderRadius: 999, padding: "9px 13px", cursor: "pointer", fontSize: 22 },
+  chatFab: { position: "fixed", right: 22, bottom: 92, width: 56, height: 56, borderRadius: 22, border: 0, background: COLORS.coral, color: "white", fontSize: 24, boxShadow: "0 15px 35px #ff6f6144", zIndex: 6, cursor: "pointer" }, overlay: { position: "fixed", inset: 0, background: "#00000044", zIndex: 20, display: "flex", alignItems: "flex-end", justifyContent: "center" }, chat: { width: "100%", maxWidth: 540, height: "82dvh", background: COLORS.white, borderRadius: "28px 28px 0 0", display: "flex", flexDirection: "column", overflow: "hidden" }, chatHead: { padding: 16, display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${COLORS.line}` }, chatBody: { flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 10, background: "#FFF9EF" }, msg: { maxWidth: "84%", padding: "11px 13px", borderRadius: 18, whiteSpace: "pre-wrap", lineHeight: 1.45, fontSize: 14 }, chatInput: { display: "flex", gap: 8, padding: 12, borderTop: `1px solid ${COLORS.line}` }, send: { border: 0, borderRadius: 16, padding: "0 15px", background: COLORS.coral, color: "white", fontWeight: 800 },
+  header: { display: "grid", gridTemplateColumns: "44px 1fr 44px", alignItems: "center", marginBottom: 12 }, back: { width: 40, height: 40, borderRadius: 16, border: `1px solid ${COLORS.line}`, background: COLORS.white, fontSize: 20, cursor: "pointer" }, toast: { position: "fixed", top: 18, left: "50%", transform: "translateX(-50%)", background: COLORS.text, color: "white", padding: "10px 18px", borderRadius: 999, zIndex: 40 },
+  breath: { width: 210, height: 210, borderRadius: "50%", background: `radial-gradient(circle, ${COLORS.mint}, #71D8C6)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 900, transition: "transform 1s ease", boxShadow: "0 25px 60px #49cbb244" }, balloonBox: { height: 360, background: COLORS.white, borderRadius: 28, border: `1px solid ${COLORS.line}`, position: "relative", overflow: "hidden", marginBottom: 14 }, movingBalloon: { position: "absolute", fontSize: 70, animation: "moveBalloon 7s ease-in-out infinite" }, memory: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }, memCard: { height: 74, border: `1px solid ${COLORS.line}`, borderRadius: 18, background: COLORS.white, fontSize: 28 }, tapBtn: { width: 160, height: 160, borderRadius: "50%", border: 0, background: COLORS.coral, color: "white", fontWeight: 900, fontSize: 24, boxShadow: "0 18px 40px #ff6f6144" }, colorPrompt: { height: 130, borderRadius: 24, margin: "10px 0" },
+};
+
+const style = document.createElement("style");
+style.innerHTML = `@keyframes moveBalloon { 0%{left:8%;top:70%;transform:scale(1)} 20%{left:65%;top:50%;transform:scale(1.08)} 40%{left:28%;top:18%;transform:scale(.95)} 60%{left:75%;top:12%;transform:scale(1.05)} 80%{left:12%;top:38%;transform:scale(.98)} 100%{left:8%;top:70%;transform:scale(1)} }`;
+if (typeof document !== "undefined" && !document.getElementById("mindspace-v7-keyframes")) { style.id = "mindspace-v7-keyframes"; document.head.appendChild(style); }
