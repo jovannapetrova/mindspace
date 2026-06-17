@@ -306,7 +306,15 @@ export default function MindSpace() {
   const [aiLoading, setAiLoading] = useState(false);
   const chatEnd = useRef(null);
 
-  useEffect(() => { const id = setTimeout(() => setScreen("auth"), 1800); return () => clearTimeout(id); }, []);
+  useEffect(() => {
+    const savedEmail = load("ms_current_user_email", "");
+    if (savedEmail && isValidEmail(savedEmail)) {
+      startUserSession(savedEmail);
+      return;
+    }
+    const id = setTimeout(() => setScreen("auth"), 1800);
+    return () => clearTimeout(id);
+  }, []);
   useEffect(() => saveUserData(user?.email, "entries", entries), [entries, user]);
   useEffect(() => saveUserData(user?.email, "loginDays", loginDays), [loginDays, user]);
   useEffect(() => saveUserData(user?.email, "gratitudes", gratitudes), [gratitudes, user]);
@@ -358,33 +366,12 @@ export default function MindSpace() {
     setLoginDays(updatedLoginDays);
     setUser({ email: safeEmail, name: profileToUse.nick });
 
+    save("ms_current_user_email", safeEmail);
     saveUserData(safeEmail, "profile", profileToUse);
     saveUserData(safeEmail, "loginDays", updatedLoginDays);
     setScreen("app");
   }
 
-  function socialLogin(provider = "google") {
-    const email = normalizeEmail(auth.email);
-    if (!isValidEmail(email)) {
-      setToast(provider === "google" ? "Внеси Gmail адреса пред Google најава." : "Внеси e-mail адреса пред Apple најава.");
-      setTimeout(() => setToast(""), 1800);
-      return;
-    }
-
-    const users = load("ms_users_v7", {});
-    if (!users[email]) {
-      const newName = auth.name || nameFromEmail(email);
-      users[email] = { name: newName, pass: null, provider };
-      save("ms_users_v7", users);
-      saveUserData(email, "profile", { ...DEFAULT_PROFILE, nick: newName });
-      saveUserData(email, "entries", []);
-      saveUserData(email, "gratitudes", []);
-      saveUserData(email, "loginDays", []);
-      saveUserData(email, "xp", 0);
-    }
-
-    startUserSession(email, users[email].name);
-  }
   function register() {
     const email = normalizeEmail(auth.email);
     const name = auth.name.trim();
@@ -417,11 +404,10 @@ export default function MindSpace() {
     saveUserData(email, "loginDays", []);
     saveUserData(email, "xp", 0);
 
-    setProfile({ ...DEFAULT_PROFILE, nick: name });
-    setAuth(a => ({ ...a, email, name, pass: "", pass2: "" }));
-    setToast("Профилот е креиран. Сега најави се.");
-    setAuthMode("login");
-    setTimeout(() => setToast(""), 1800);
+    setAuth({ name, email, pass: "", pass2: "" });
+    setToast("Профилот е креиран.");
+    setTimeout(() => setToast(""), 1400);
+    startUserSession(email, name);
   }
   function loginWithPassword() {
     const email = normalizeEmail(auth.email);
@@ -440,22 +426,17 @@ export default function MindSpace() {
       return;
     }
 
-    if (!users[email].pass) {
-      setToast("Овој профил е направен со Google/Apple. Користи го истото копче.");
-      setTimeout(() => setToast(""), 2000);
-      return;
-    }
-
     if (users[email].pass !== auth.pass) {
       setToast("Е-поштата или лозинката не се точни.");
       setTimeout(() => setToast(""), 1600);
       return;
     }
 
-    setAuth(a => ({ ...a, email, name: users[email].name || a.name }));
+    setAuth(a => ({ ...a, email, name: users[email].name || a.name, pass: "" }));
     startUserSession(email, users[email].name);
   }
   function logout() {
+    localStorage.removeItem("ms_current_user_email");
     setUser(null);
     setProfile({ ...DEFAULT_PROFILE });
     setEntries([]);
@@ -503,7 +484,7 @@ export default function MindSpace() {
 
   if (screen === "splash") return <div style={styles.page}><div style={styles.center}><Buddy size={108} /><h1 style={styles.logo}>Мој Другар</h1><p style={styles.muted}>За твоето добро расположение 🌤️</p></div></div>;
 
-  if (screen === "auth") return <div style={styles.page}>{toast && <Toast>{toast}</Toast>}<div style={{ maxWidth: 520, margin: "45px auto" }}><Card><Buddy /><h1 style={styles.title}>{authMode === "login" ? "Добре дојде назад 👋" : "Да се запознаеме 🌱"}</h1>{authMode === "register" && <Input placeholder="Име" value={auth.name} onChange={v => setAuth({ ...auth, name: v })} />}<Input placeholder="Е-пошта / Gmail" value={auth.email} onChange={v => setAuth({ ...auth, email: v })} /><Input type="password" placeholder="Лозинка" value={auth.pass} onChange={v => setAuth({ ...auth, pass: v })} />{authMode === "register" && <Input type="password" placeholder="Потврди лозинка" value={auth.pass2} onChange={v => setAuth({ ...auth, pass2: v })} />}<Button onClick={authMode === "login" ? loginWithPassword : register}>{authMode === "login" ? "Најави се" : "Создај профил"}</Button><p style={styles.or}>или</p><Button ghost onClick={() => socialLogin("google")}>Продолжи со Google</Button><Button ghost onClick={() => socialLogin("apple")}>Продолжи со Apple</Button><p style={styles.textSmall}>{authMode === "login" ? "Немаш профил? " : "Веќе имаш профил? "}<button style={styles.link} onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}>{authMode === "login" ? "Регистрирај се" : "Најави се"}</button></p></Card></div></div>;
+  if (screen === "auth") return <div style={styles.page}>{toast && <Toast>{toast}</Toast>}<div style={{ maxWidth: 520, margin: "45px auto" }}><Card><Buddy /><h1 style={styles.title}>{authMode === "login" ? "Добре дојде назад 👋" : "Да се запознаеме 🌱"}</h1>{authMode === "register" && <Input placeholder="Име" value={auth.name} onChange={v => setAuth({ ...auth, name: v })} />}<Input placeholder="Е-пошта" value={auth.email} onChange={v => setAuth({ ...auth, email: v })} /><Input type="password" placeholder="Лозинка" value={auth.pass} onChange={v => setAuth({ ...auth, pass: v })} />{authMode === "register" && <Input type="password" placeholder="Потврди лозинка" value={auth.pass2} onChange={v => setAuth({ ...auth, pass2: v })} />}<Button onClick={authMode === "login" ? loginWithPassword : register}>{authMode === "login" ? "Најави се" : "Создај профил"}</Button><p style={styles.textSmall}>{authMode === "login" ? "Немаш профил? " : "Веќе имаш профил? "}<button style={styles.link} onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}>{authMode === "login" ? "Регистрирај се" : "Најави се"}</button></p></Card></div></div>;
 
   if (screen === "result") {
     const mood = MOODS.find(m => m.id === result?.mood) || MOODS[2];
