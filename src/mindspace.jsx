@@ -154,10 +154,21 @@ function formatEntryTime(date) {
   return new Date(date).toLocaleTimeString("mk-MK", { hour: "2-digit", minute: "2-digit" });
 }
 
-const DEFAULT_PROFILE = { nick: "Јована", avatar: "🦊" };
+const DEFAULT_PROFILE = { nick: "Другарче", avatar: "🦊" };
 
 function normalizeEmail(email) {
-  return String(email || "guest@demo.local").trim().toLowerCase();
+  return String(email || "").trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email));
+}
+
+function nameFromEmail(email) {
+  const firstPart = normalizeEmail(email).split("@")[0] || "Другарче";
+  return firstPart
+    .replace(/[._-]+/g, " ")
+    .replace(/\b\w/g, ch => ch.toUpperCase());
 }
 
 function userKey(email, key) {
@@ -314,55 +325,135 @@ export default function MindSpace() {
     });
   }, [entries]);
 
-  function loginDemo(provider = "email", overrideEmail = null) {
-    const email = normalizeEmail(overrideEmail || auth.email || `${provider}@demo.local`);
-    const saved = loadUserData(email);
+  function startUserSession(email, fallbackName = "") {
+    const safeEmail = normalizeEmail(email);
+    if (!isValidEmail(safeEmail)) {
+      setToast("Внеси валидна е-пошта.");
+      setTimeout(() => setToast(""), 1600);
+      return;
+    }
+
+    const saved = loadUserData(safeEmail);
+    const users = load("ms_users_v7", {});
+    const resolvedName =
+      saved.profile?.nick && saved.profile.nick !== DEFAULT_PROFILE.nick
+        ? saved.profile.nick
+        : users[safeEmail]?.name || fallbackName || nameFromEmail(safeEmail);
+
+    const profileToUse = {
+      ...DEFAULT_PROFILE,
+      ...saved.profile,
+      nick: resolvedName,
+    };
+
     const today = dayKey();
     const updatedLoginDays = saved.loginDays.includes(today)
       ? saved.loginDays
       : [today, ...saved.loginDays].slice(0, 365);
 
-    setProfile(saved.profile);
+    setProfile(profileToUse);
     setEntries(saved.entries);
     setGratitudes(saved.gratitudes);
     setXp(saved.xp);
     setLoginDays(updatedLoginDays);
-    setUser({ email, name: saved.profile.nick || auth.name || DEFAULT_PROFILE.nick });
+    setUser({ email: safeEmail, name: profileToUse.nick });
 
-    saveUserData(email, "loginDays", updatedLoginDays);
+    saveUserData(safeEmail, "profile", profileToUse);
+    saveUserData(safeEmail, "loginDays", updatedLoginDays);
     setScreen("app");
   }
-  function register() {
-    if (!auth.name || !auth.email || !auth.pass || auth.pass !== auth.pass2) {
-      setToast("Провери име, е-пошта и лозинки.");
-      setTimeout(() => setToast(""), 1600);
+
+  function socialLogin(provider = "google") {
+    const email = normalizeEmail(auth.email);
+    if (!isValidEmail(email)) {
+      setToast(provider === "google" ? "Внеси Gmail адреса пред Google најава." : "Внеси e-mail адреса пред Apple најава.");
+      setTimeout(() => setToast(""), 1800);
       return;
     }
-    const email = normalizeEmail(auth.email);
+
     const users = load("ms_users_v7", {});
-    users[email] = { name: auth.name, pass: auth.pass };
+    if (!users[email]) {
+      const newName = auth.name || nameFromEmail(email);
+      users[email] = { name: newName, pass: null, provider };
+      save("ms_users_v7", users);
+      saveUserData(email, "profile", { ...DEFAULT_PROFILE, nick: newName });
+      saveUserData(email, "entries", []);
+      saveUserData(email, "gratitudes", []);
+      saveUserData(email, "loginDays", []);
+      saveUserData(email, "xp", 0);
+    }
+
+    startUserSession(email, users[email].name);
+  }
+  function register() {
+    const email = normalizeEmail(auth.email);
+    const name = auth.name.trim();
+
+    if (!name || !isValidEmail(email) || !auth.pass || auth.pass !== auth.pass2) {
+      setToast("Провери име, валидна е-пошта и лозинки.");
+      setTimeout(() => setToast(""), 1800);
+      return;
+    }
+
+    if (auth.pass.length < 8) {
+      setToast("Лозинката треба да има најмалку 8 карактери.");
+      setTimeout(() => setToast(""), 1800);
+      return;
+    }
+
+    const users = load("ms_users_v7", {});
+    if (users[email]) {
+      setToast("Веќе постои профил со оваа е-пошта. Најави се.");
+      setAuthMode("login");
+      setTimeout(() => setToast(""), 1800);
+      return;
+    }
+
+    users[email] = { name, pass: auth.pass, provider: "email" };
     save("ms_users_v7", users);
-    saveUserData(email, "profile", { ...DEFAULT_PROFILE, nick: auth.name });
+    saveUserData(email, "profile", { ...DEFAULT_PROFILE, nick: name });
     saveUserData(email, "entries", []);
     saveUserData(email, "gratitudes", []);
     saveUserData(email, "loginDays", []);
     saveUserData(email, "xp", 0);
-    setProfile(p => ({ ...p, nick: auth.name }));
-    setAuth(a => ({ ...a, email }));
+
+    setProfile({ ...DEFAULT_PROFILE, nick: name });
+    setAuth(a => ({ ...a, email, name, pass: "", pass2: "" }));
     setToast("Профилот е креиран. Сега најави се.");
     setAuthMode("login");
-    setTimeout(() => setToast(""), 1600);
+    setTimeout(() => setToast(""), 1800);
   }
   function loginWithPassword() {
     const email = normalizeEmail(auth.email);
     const users = load("ms_users_v7", {});
-    if (!users[email] || users[email].pass !== auth.pass) {
+
+    if (!isValidEmail(email)) {
+      setToast("Внеси валидна е-пошта.");
+      setTimeout(() => setToast(""), 1600);
+      return;
+    }
+
+    if (!users[email]) {
+      setToast("Нема профил со оваа е-пошта. Регистрирај се.");
+      setAuthMode("register");
+      setTimeout(() => setToast(""), 1800);
+      return;
+    }
+
+    if (!users[email].pass) {
+      setToast("Овој профил е направен со Google/Apple. Користи го истото копче.");
+      setTimeout(() => setToast(""), 2000);
+      return;
+    }
+
+    if (users[email].pass !== auth.pass) {
       setToast("Е-поштата или лозинката не се точни.");
       setTimeout(() => setToast(""), 1600);
       return;
     }
+
     setAuth(a => ({ ...a, email, name: users[email].name || a.name }));
-    loginDemo("email", email);
+    startUserSession(email, users[email].name);
   }
   function logout() {
     setUser(null);
@@ -412,7 +503,7 @@ export default function MindSpace() {
 
   if (screen === "splash") return <div style={styles.page}><div style={styles.center}><Buddy size={108} /><h1 style={styles.logo}>Мој Другар</h1><p style={styles.muted}>За твоето добро расположение 🌤️</p></div></div>;
 
-  if (screen === "auth") return <div style={styles.page}>{toast && <Toast>{toast}</Toast>}<div style={{ maxWidth: 520, margin: "45px auto" }}><Card><Buddy /><h1 style={styles.title}>{authMode === "login" ? "Добре дојде назад 👋" : "Да се запознаеме 🌱"}</h1>{authMode === "register" && <Input placeholder="Име" value={auth.name} onChange={v => setAuth({ ...auth, name: v })} />}<Input placeholder="Е-пошта" value={auth.email} onChange={v => setAuth({ ...auth, email: v })} /><Input type="password" placeholder="Лозинка" value={auth.pass} onChange={v => setAuth({ ...auth, pass: v })} />{authMode === "register" && <Input type="password" placeholder="Потврди лозинка" value={auth.pass2} onChange={v => setAuth({ ...auth, pass2: v })} />}<Button onClick={authMode === "login" ? loginWithPassword : register}>{authMode === "login" ? "Најави се" : "Создај профил"}</Button><p style={styles.or}>или</p><Button ghost onClick={() => loginDemo("google")}>Продолжи со Google</Button><Button ghost onClick={() => loginDemo("apple")}>Продолжи со Apple</Button><p style={styles.textSmall}>{authMode === "login" ? "Немаш профил? " : "Веќе имаш профил? "}<button style={styles.link} onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}>{authMode === "login" ? "Регистрирај се" : "Најави се"}</button></p></Card></div></div>;
+  if (screen === "auth") return <div style={styles.page}>{toast && <Toast>{toast}</Toast>}<div style={{ maxWidth: 520, margin: "45px auto" }}><Card><Buddy /><h1 style={styles.title}>{authMode === "login" ? "Добре дојде назад 👋" : "Да се запознаеме 🌱"}</h1>{authMode === "register" && <Input placeholder="Име" value={auth.name} onChange={v => setAuth({ ...auth, name: v })} />}<Input placeholder="Е-пошта / Gmail" value={auth.email} onChange={v => setAuth({ ...auth, email: v })} /><Input type="password" placeholder="Лозинка" value={auth.pass} onChange={v => setAuth({ ...auth, pass: v })} />{authMode === "register" && <Input type="password" placeholder="Потврди лозинка" value={auth.pass2} onChange={v => setAuth({ ...auth, pass2: v })} />}<Button onClick={authMode === "login" ? loginWithPassword : register}>{authMode === "login" ? "Најави се" : "Создај профил"}</Button><p style={styles.or}>или</p><Button ghost onClick={() => socialLogin("google")}>Продолжи со Google</Button><Button ghost onClick={() => socialLogin("apple")}>Продолжи со Apple</Button><p style={styles.textSmall}>{authMode === "login" ? "Немаш профил? " : "Веќе имаш профил? "}<button style={styles.link} onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}>{authMode === "login" ? "Регистрирај се" : "Најави се"}</button></p></Card></div></div>;
 
   if (screen === "result") {
     const mood = MOODS.find(m => m.id === result?.mood) || MOODS[2];
